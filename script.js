@@ -225,6 +225,8 @@ function renderDashboard() {
 }
 
 function renderCalendar() {
+  if (!calendarGrid || !calendarMonthLabel) return;
+
   const items = allDueItems();
   const map = new Map();
   items.forEach((item) => {
@@ -309,44 +311,50 @@ function setView(viewName) {
   state.currentView = viewName;
 
   const showDashboard = viewName === "dashboard";
-  dashboardView.hidden = !showDashboard;
-  calendarView.hidden = showDashboard;
-  dashboardView.classList.toggle("active", showDashboard);
-  calendarView.classList.toggle("active", !showDashboard);
-  navDashboard.classList.toggle("active", showDashboard);
-  navCalendar.classList.toggle("active", !showDashboard);
+  if (dashboardView) dashboardView.hidden = !showDashboard;
+  if (calendarView) calendarView.hidden = showDashboard;
+  if (dashboardView) dashboardView.classList.toggle("active", showDashboard);
+  if (calendarView) calendarView.classList.toggle("active", !showDashboard);
+  if (navDashboard) navDashboard.classList.toggle("active", showDashboard);
+  if (navCalendar) navCalendar.classList.toggle("active", !showDashboard);
 
-  pageTitle.textContent = showDashboard ? "My Classes" : "Due Date Calendar";
-  pageSubtitle.textContent = showDashboard
-    ? "Track assignments and quizzes by class"
-    : "Google Classroom-style monthly due date view";
+  if (pageTitle) pageTitle.textContent = showDashboard ? "My Classes" : "Due Date Calendar";
+  if (pageSubtitle) {
+    pageSubtitle.textContent = showDashboard
+      ? "Track assignments and quizzes by class"
+      : "Google Classroom-style monthly due date view";
+  }
   addClassBtn.style.display = showDashboard ? "inline-block" : "none";
 
   saveState();
 }
 
-navDashboard.addEventListener("click", () => setView("dashboard"));
-navCalendar.addEventListener("click", () => setView("calendar"));
+if (navDashboard) navDashboard.addEventListener("click", () => setView("dashboard"));
+if (navCalendar) navCalendar.addEventListener("click", () => setView("calendar"));
 
-prevMonthBtn.addEventListener("click", () => {
-  state.calendarMonth -= 1;
-  if (state.calendarMonth < 0) {
-    state.calendarMonth = 11;
-    state.calendarYear -= 1;
-  }
-  saveState();
-  renderCalendar();
-});
+if (prevMonthBtn) {
+  prevMonthBtn.addEventListener("click", () => {
+    state.calendarMonth -= 1;
+    if (state.calendarMonth < 0) {
+      state.calendarMonth = 11;
+      state.calendarYear -= 1;
+    }
+    saveState();
+    renderCalendar();
+  });
+}
 
-nextMonthBtn.addEventListener("click", () => {
-  state.calendarMonth += 1;
-  if (state.calendarMonth > 11) {
-    state.calendarMonth = 0;
-    state.calendarYear += 1;
-  }
-  saveState();
-  renderCalendar();
-});
+if (nextMonthBtn) {
+  nextMonthBtn.addEventListener("click", () => {
+    state.calendarMonth += 1;
+    if (state.calendarMonth > 11) {
+      state.calendarMonth = 0;
+      state.calendarYear += 1;
+    }
+    saveState();
+    renderCalendar();
+  });
+}
 
 addClassBtn.addEventListener("click", () => {
   const user = getCurrentUserData();
