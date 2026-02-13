@@ -232,10 +232,9 @@ function allCompletedItems() {
 
 function updateCounter() {
   const total = getCurrentUserData().classes.length;
-  classCounter.textContent = `${total} / ${MAX_CLASSES} classes`;
-  const atMax = total >= MAX_CLASSES;
-  addClassBtn.disabled = atMax;
-  maxNotice.textContent = atMax ? "You reached the maximum of 8 classes." : "";
+  classCounter.textContent = `${total} classes`;
+  addClassBtn.disabled = false;
+  maxNotice.textContent = "";
 }
 
 function sameItem(a, b) {
@@ -550,11 +549,15 @@ function renderCompleted() {
 }
 
 function setView(viewName) {
-  state.currentView = viewName;
+  const normalizedView =
+    viewName === "dashboard" || viewName === "calendar" || viewName === "completed"
+      ? viewName
+      : "dashboard";
+  state.currentView = normalizedView;
 
-  const showDashboard = viewName === "dashboard";
-  const showCalendar = viewName === "calendar";
-  const showCompleted = viewName === "completed";
+  const showDashboard = normalizedView === "dashboard";
+  const showCalendar = normalizedView === "calendar";
+  const showCompleted = normalizedView === "completed";
 
   if (dashboardView) dashboardView.hidden = !showDashboard;
   if (calendarView) calendarView.hidden = !showCalendar;
@@ -630,10 +633,6 @@ if (nextMonthBtn) {
 
 addClassBtn.addEventListener("click", () => {
   const user = getCurrentUserData();
-  if (user.classes.length >= MAX_CLASSES) {
-    updateCounter();
-    return;
-  }
 
   user.classes.push({
     id: makeId(),
@@ -645,6 +644,7 @@ addClassBtn.addEventListener("click", () => {
   });
 
   saveState();
+  setView("dashboard");
   renderDashboard();
   renderCalendar();
   renderCompleted();
