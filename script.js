@@ -168,10 +168,14 @@ function allDueItems() {
 
   user.classes.forEach((classObj) => {
     classObj.assignments.forEach((item) => {
-      items.push({ ...item, className: classObj.name, type: "assignment" });
+      if (!isItemCompleted(classObj, "assignments", item)) {
+        items.push({ ...item, className: classObj.name, type: "assignment" });
+      }
     });
     classObj.quizzes.forEach((item) => {
-      items.push({ ...item, className: classObj.name, type: "quiz" });
+      if (!isItemCompleted(classObj, "quizzes", item)) {
+        items.push({ ...item, className: classObj.name, type: "quiz" });
+      }
     });
   });
 
@@ -207,12 +211,37 @@ function updateCounter() {
   maxNotice.textContent = atMax ? "You reached the maximum of 8 classes." : "";
 }
 
-function markItemDone(classObj, sourceKey, itemId) {
+function sameItem(a, b) {
+  if (!a || !b) return false;
+  if (a.id && b.id) return a.id === b.id;
+  return a.name === b.name && a.dueDate === b.dueDate;
+}
+
+function isItemCompleted(classObj, sourceKey, item) {
+  const type = sourceKey === "quizzes" ? "quiz" : "assignment";
+  return classObj.completed.some((done) => {
+    if (done.sourceId && item.id) return done.sourceId === item.id;
+    return done.type === type && done.name === item.name && done.dueDate === item.dueDate;
+  });
+}
+
+function markItemDone(classObj, sourceKey, selectedItem) {
   const list = classObj[sourceKey];
-  const item = list.find((entry) => entry.id === itemId);
+  const item =
+    list.find((entry) => sameItem(entry, selectedItem)) ||
+    list.find((entry) => entry.name === selectedItem.name && entry.dueDate === selectedItem.dueDate);
   if (!item) return;
 
-  classObj[sourceKey] = list.filter((entry) => entry.id !== itemId);
+  classObj[sourceKey] = list.filter((entry) => !sameItem(entry, item));
+
+  if (isItemCompleted(classObj, sourceKey, item)) {
+    saveState();
+    renderDashboard();
+    renderCalendar();
+    renderCompleted();
+    return;
+  }
+
   classObj.completed.push({
     id: makeId(),
     sourceId: item.id,
@@ -347,27 +376,31 @@ function renderDashboard() {
       renderCalendar();
     });
 
-    classObj.assignments.forEach((item) => {
+    classObj.assignments
+      .filter((item) => !isItemCompleted(classObj, "assignments", item))
+      .forEach((item) => {
       assignmentsList.appendChild(
         createItemRow(
           item,
           "Due",
-          () => markItemDone(classObj, "assignments", item.id),
+          () => markItemDone(classObj, "assignments", item),
           () => removeActiveItem(classObj, "assignments", item.id)
         )
       );
-    });
+      });
 
-    classObj.quizzes.forEach((item) => {
+    classObj.quizzes
+      .filter((item) => !isItemCompleted(classObj, "quizzes", item))
+      .forEach((item) => {
       quizzesList.appendChild(
         createItemRow(
           item,
           "Due",
-          () => markItemDone(classObj, "quizzes", item.id),
+          () => markItemDone(classObj, "quizzes", item),
           () => removeActiveItem(classObj, "quizzes", item.id)
         )
       );
-    });
+      });
 
     addPressAnimation(summaryBtn);
     addPressAnimation(removeClassBtn);
