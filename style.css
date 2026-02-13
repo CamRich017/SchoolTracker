@@ -375,6 +375,23 @@ body {
   background: rgba(130, 247, 179, 0.2);
 }
 
+.item-remove-btn {
+  border: 1px solid rgba(255, 110, 127, 0.45);
+  background: rgba(255, 110, 127, 0.12);
+  color: #ff9eab;
+  border-radius: 6px;
+  padding: 0.24rem 0.54rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.14s ease, background 0.14s ease;
+}
+
+.item-remove-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 110, 127, 0.2);
+}
+
 .max-notice {
   min-height: 1.2rem;
   color: var(--danger);

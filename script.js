@@ -89,13 +89,28 @@ const browserUserId = getBrowserUserId();
 
 function normalizeClassData(classObj, index) {
   const fallback = `Class ${index + 1}`;
+  const normalizeEntry = (entry) => ({
+    id: entry && entry.id ? entry.id : makeId(),
+    name: entry && entry.name ? entry.name : "Untitled",
+    dueDate: entry && entry.dueDate ? entry.dueDate : ""
+  });
+
+  const normalizeCompletedEntry = (entry) => ({
+    id: entry && entry.id ? entry.id : makeId(),
+    sourceId: entry && entry.sourceId ? entry.sourceId : null,
+    name: entry && entry.name ? entry.name : "Untitled",
+    dueDate: entry && entry.dueDate ? entry.dueDate : "",
+    type: entry && entry.type ? entry.type : "assignment",
+    completedAt: entry && entry.completedAt ? entry.completedAt : new Date().toISOString()
+  });
+
   return {
     id: classObj.id || makeId(),
     name: classObj.name || fallback,
     collapsed: Boolean(classObj.collapsed),
-    assignments: Array.isArray(classObj.assignments) ? classObj.assignments : [],
-    quizzes: Array.isArray(classObj.quizzes) ? classObj.quizzes : [],
-    completed: Array.isArray(classObj.completed) ? classObj.completed : []
+    assignments: Array.isArray(classObj.assignments) ? classObj.assignments.map(normalizeEntry) : [],
+    quizzes: Array.isArray(classObj.quizzes) ? classObj.quizzes.map(normalizeEntry) : [],
+    completed: Array.isArray(classObj.completed) ? classObj.completed.map(normalizeCompletedEntry) : []
   };
 }
 
@@ -213,13 +228,27 @@ function markItemDone(classObj, sourceKey, itemId) {
   renderCompleted();
 }
 
-function createItemRow(item, typeLabel, onDone) {
+function removeActiveItem(classObj, sourceKey, itemId) {
+  classObj[sourceKey] = classObj[sourceKey].filter((entry) => entry.id !== itemId);
+  saveState();
+  renderDashboard();
+  renderCalendar();
+}
+
+function createItemRow(item, typeLabel, onDone, onRemove) {
   const li = document.createElement("li");
   li.innerHTML = `
     <span class="item-name">${item.name}</span>
     <span class="due-date">${typeLabel}: ${formatDueDate(item.dueDate)}</span>
+    <button type="button" class="item-remove-btn" aria-label="Remove ${item.name}">Remove</button>
     <button type="button" class="item-done-btn" aria-label="Mark ${item.name} as done">Done</button>
   `;
+
+  const removeBtn = li.querySelector(".item-remove-btn");
+  if (removeBtn) {
+    removeBtn.addEventListener("click", onRemove);
+    addPressAnimation(removeBtn);
+  }
 
   const doneBtn = li.querySelector(".item-done-btn");
   if (doneBtn) {
@@ -320,12 +349,24 @@ function renderDashboard() {
 
     classObj.assignments.forEach((item) => {
       assignmentsList.appendChild(
-        createItemRow(item, "Due", () => markItemDone(classObj, "assignments", item.id))
+        createItemRow(
+          item,
+          "Due",
+          () => markItemDone(classObj, "assignments", item.id),
+          () => removeActiveItem(classObj, "assignments", item.id)
+        )
       );
     });
 
     classObj.quizzes.forEach((item) => {
-      quizzesList.appendChild(createItemRow(item, "Due", () => markItemDone(classObj, "quizzes", item.id)));
+      quizzesList.appendChild(
+        createItemRow(
+          item,
+          "Due",
+          () => markItemDone(classObj, "quizzes", item.id),
+          () => removeActiveItem(classObj, "quizzes", item.id)
+        )
+      );
     });
 
     addPressAnimation(summaryBtn);
