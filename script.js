@@ -126,14 +126,31 @@ function getCurrentUserData() {
   }
 
   const user = state.users[browserUserId];
-  user.classes = (Array.isArray(user.classes) ? user.classes : []).map((classObj, i) => ({
-    id: classObj.id || makeId(),
-    name: classObj.name || `Class ${i + 1}`,
-    collapsed: Boolean(classObj.collapsed),
-    assignments: Array.isArray(classObj.assignments) ? classObj.assignments.map(normalizeItem) : [],
-    quizzes: Array.isArray(classObj.quizzes) ? classObj.quizzes.map(normalizeItem) : [],
-    completed: Array.isArray(classObj.completed) ? classObj.completed.map(normalizeCompleted) : []
-  }));
+  if (!Array.isArray(user.classes)) {
+    user.classes = [];
+  }
+
+  for (let i = 0; i < user.classes.length; i += 1) {
+    const classObj = user.classes[i];
+    if (!classObj || typeof classObj !== "object") {
+      user.classes[i] = {
+        id: makeId(),
+        name: `Class ${i + 1}`,
+        collapsed: true,
+        assignments: [],
+        quizzes: [],
+        completed: []
+      };
+      continue;
+    }
+
+    if (!classObj.id) classObj.id = makeId();
+    if (!classObj.name) classObj.name = `Class ${i + 1}`;
+    classObj.collapsed = Boolean(classObj.collapsed);
+    classObj.assignments = Array.isArray(classObj.assignments) ? classObj.assignments.map(normalizeItem) : [];
+    classObj.quizzes = Array.isArray(classObj.quizzes) ? classObj.quizzes.map(normalizeItem) : [];
+    classObj.completed = Array.isArray(classObj.completed) ? classObj.completed.map(normalizeCompleted) : [];
+  }
 
   return user;
 }
