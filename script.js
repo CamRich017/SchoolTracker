@@ -1,5 +1,4 @@
-const MAX_CLASSES = 8;
-const STORAGE_KEY = "schooltracker.v2";
+const STORAGE_KEY = "schooltracker.v3";
 const BROWSER_USER_KEY = "schooltracker.browserUserId";
 
 const addClassBtn = document.getElementById("addClassBtn");
@@ -32,7 +31,7 @@ const memoryStore = {};
 function storageGet(key) {
   try {
     return localStorage.getItem(key);
-  } catch (err) {
+  } catch {
     return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
   }
 }
@@ -40,7 +39,7 @@ function storageGet(key) {
 function storageSet(key, value) {
   try {
     localStorage.setItem(key, value);
-  } catch (err) {
+  } catch {
     memoryStore[key] = value;
   }
 }
@@ -60,7 +59,7 @@ function getBrowserUserId() {
   return next;
 }
 
-function buildDefaultState() {
+function defaultState() {
   const now = new Date();
   return {
     users: {},
@@ -70,93 +69,67 @@ function buildDefaultState() {
   };
 }
 
+function sanitizeClass(entry, index) {
+  const fallback = `Class ${index + 1}`;
+  const normalizeItem = (item) => ({
+    id: item && item.id ? item.id : makeId(),
+    name: item && item.name ? item.name : "Untitled",
+    dueDate: item && item.dueDate ? item.dueDate : ""
+  });
+
+  const normalizeDone = (item) => ({
+    id: item && item.id ? item.id : makeId(),
+    sourceId: item && item.sourceId ? item.sourceId : null,
+    name: item && item.name ? item.name : "Untitled",
+    dueDate: item && item.dueDate ? item.dueDate : "",
+    type: item && item.type ? item.type : "assignment",
+    completedAt: item && item.completedAt ? item.completedAt : new Date().toISOString()
+  });
+
+  return {
+    id: entry && entry.id ? entry.id : makeId(),
+    name: entry && entry.name ? entry.name : fallback,
+    collapsed: Boolean(entry && entry.collapsed),
+    assignments: Array.isArray(entry && entry.assignments) ? entry.assignments.map(normalizeItem) : [],
+    quizzes: Array.isArray(entry && entry.quizzes) ? entry.quizzes.map(normalizeItem) : [],
+    completed: Array.isArray(entry && entry.completed) ? entry.completed.map(normalizeDone) : []
+  };
+}
+
 function loadState() {
   try {
     const raw = storageGet(STORAGE_KEY);
-    if (!raw) return buildDefaultState();
+    if (!raw) return defaultState();
+
     const parsed = JSON.parse(raw);
-    const merged = {
-      ...buildDefaultState(),
-      ...parsed
-    };
+    const merged = { ...defaultState(), ...parsed };
+
     if (!merged.users || typeof merged.users !== "object" || Array.isArray(merged.users)) {
       merged.users = {};
     }
-    if (!["dashboard", "calendar", "completed"].includes(merged.currentView)) {
-      merged.currentView = "dashboard";
-    }
+
     if (!Number.isInteger(merged.calendarMonth) || merged.calendarMonth < 0 || merged.calendarMonth > 11) {
       merged.calendarMonth = new Date().getMonth();
     }
+
     if (!Number.isInteger(merged.calendarYear) || merged.calendarYear < 1970) {
       merged.calendarYear = new Date().getFullYear();
     }
+
+    if (!["dashboard", "calendar", "completed"].includes(merged.currentView)) {
+      merged.currentView = "dashboard";
+    }
+
     return merged;
-  } catch (err) {
-    return buildDefaultState();
+  } catch {
+    return defaultState();
   }
 }
 
 const state = loadState();
 const browserUserId = getBrowserUserId();
 
-function normalizeClassData(classObj, index) {
-  const fallback = `Class ${index + 1}`;
-  const normalizeEntry = (entry) => ({
-    id: entry && entry.id ? entry.id : makeId(),
-    name: entry && entry.name ? entry.name : "Untitled",
-    dueDate: entry && entry.dueDate ? entry.dueDate : ""
-  });
-
-  const normalizeCompletedEntry = (entry) => ({
-    id: entry && entry.id ? entry.id : makeId(),
-    sourceId: entry && entry.sourceId ? entry.sourceId : null,
-    name: entry && entry.name ? entry.name : "Untitled",
-    dueDate: entry && entry.dueDate ? entry.dueDate : "",
-    type: entry && entry.type ? entry.type : "assignment",
-    completedAt: entry && entry.completedAt ? entry.completedAt : new Date().toISOString()
-  });
-
-  return {
-    id: classObj.id || makeId(),
-    name: classObj.name || fallback,
-    collapsed: Boolean(classObj.collapsed),
-    assignments: Array.isArray(classObj.assignments) ? classObj.assignments.map(normalizeEntry) : [],
-    quizzes: Array.isArray(classObj.quizzes) ? classObj.quizzes.map(normalizeEntry) : [],
-    completed: Array.isArray(classObj.completed) ? classObj.completed.map(normalizeCompletedEntry) : []
-  };
-}
-
-function migrateCompletedReferences(user) {
-  let changed = false;
-  user.classes.forEach((classObj) => {
-    const activeByType = {
-      assignment: classObj.assignments,
-      quiz: classObj.quizzes
-    };
-
-    classObj.completed.forEach((done) => {
-      if (done.sourceId) return;
-      const list = activeByType[done.type] || [];
-      const match = list.find((item) => item.name === done.name && item.dueDate === done.dueDate);
-      if (!match) return;
-      done.sourceId = match.id;
-      changed = true;
-      if (done.type === "quiz") {
-        classObj.quizzes = classObj.quizzes.filter((entry) => entry.id !== match.id);
-      } else {
-        classObj.assignments = classObj.assignments.filter((entry) => entry.id !== match.id);
-      }
-    });
-  });
-  return changed;
-}
-
-function saveState() {
-  storageSet(STORAGE_KEY, JSON.stringify(state));
-}
-
-function getCurrentUserData() {
+function currentUser() {
   if (!state.users || typeof state.users !== "object" || Array.isArray(state.users)) {
     state.users = {};
   }
@@ -166,10 +139,12 @@ function getCurrentUserData() {
   }
 
   const user = state.users[browserUserId];
-  user.classes = (Array.isArray(user.classes) ? user.classes : []).map(normalizeClassData);
-  const changed = migrateCompletedReferences(user);
-  if (changed) saveState();
+  user.classes = (Array.isArray(user.classes) ? user.classes : []).map(sanitizeClass);
   return user;
+}
+
+function saveState() {
+  storageSet(STORAGE_KEY, JSON.stringify(state));
 }
 
 function formatDueDate(rawDate) {
@@ -177,150 +152,94 @@ function formatDueDate(rawDate) {
   return Number.isNaN(date.getTime()) ? rawDate : date.toLocaleDateString();
 }
 
+function addPressAnimation(element) {
+  if (!element) return;
+  element.addEventListener("click", () => {
+    if (!element.animate) return;
+    element.animate(
+      [{ transform: "scale(1)" }, { transform: "scale(0.985)" }, { transform: "scale(1)" }],
+      { duration: 130, easing: "ease-out" }
+    );
+  });
+}
+
 function addCardTilt(card) {
   if (!window.matchMedia("(hover: hover)").matches) return;
-
   card.addEventListener("pointermove", (event) => {
     const rect = card.getBoundingClientRect();
     const offsetX = (event.clientX - rect.left) / rect.width - 0.5;
     const offsetY = (event.clientY - rect.top) / rect.height - 0.5;
-
-    const rotateY = offsetX * 1.1;
-    const rotateX = offsetY * -0.9;
-
+    const rotateY = offsetX * 1.0;
+    const rotateX = offsetY * -0.8;
     card.style.transform = `perspective(1200px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
   });
-
   card.addEventListener("pointerleave", () => {
     card.style.transform = "perspective(1200px) rotateX(0deg) rotateY(0deg)";
   });
 }
 
-function addPressAnimation(element) {
-  if (!element) return;
-  element.addEventListener("click", () => {
-    element.animate(
-      [{ transform: "scale(1)" }, { transform: "scale(0.985)" }, { transform: "scale(1)" }],
-      { duration: 140, easing: "ease-out" }
-    );
-  });
+function updateCounter() {
+  if (classCounter) classCounter.textContent = `${currentUser().classes.length} classes`;
+  if (maxNotice) maxNotice.textContent = "";
+  if (addClassBtn) addClassBtn.disabled = false;
 }
 
-function allDueItems() {
-  const user = getCurrentUserData();
+function dueItems() {
   const items = [];
-
-  user.classes.forEach((classObj) => {
-    classObj.assignments.forEach((item) => {
-      if (!isItemCompleted(classObj, "assignments", item)) {
-        items.push({ ...item, className: classObj.name, type: "assignment" });
-      }
-    });
-    classObj.quizzes.forEach((item) => {
-      if (!isItemCompleted(classObj, "quizzes", item)) {
-        items.push({ ...item, className: classObj.name, type: "quiz" });
-      }
-    });
+  currentUser().classes.forEach((cls) => {
+    cls.assignments.forEach((item) => items.push({ ...item, className: cls.name, type: "assignment" }));
+    cls.quizzes.forEach((item) => items.push({ ...item, className: cls.name, type: "quiz" }));
   });
-
   return items;
 }
 
-function allCompletedItems() {
-  const user = getCurrentUserData();
+function doneItems() {
   const items = [];
-
-  user.classes.forEach((classObj) => {
-    classObj.completed.forEach((item) => {
-      items.push({
-        ...item,
-        classId: classObj.id,
-        className: classObj.name
-      });
-    });
+  currentUser().classes.forEach((cls) => {
+    cls.completed.forEach((item) => items.push({ ...item, className: cls.name }));
   });
-
-  return items.sort((a, b) => {
-    const aTime = new Date(a.completedAt || 0).getTime();
-    const bTime = new Date(b.completedAt || 0).getTime();
-    return bTime - aTime;
-  });
+  return items.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
 }
 
-function updateCounter() {
-  const total = getCurrentUserData().classes.length;
-  classCounter.textContent = `${total} classes`;
-  addClassBtn.disabled = false;
-  maxNotice.textContent = "";
+function removeItem(cls, key, itemId) {
+  cls[key] = cls[key].filter((it) => it.id !== itemId);
+  saveState();
+  renderAll();
 }
 
-function sameItem(a, b) {
-  if (!a || !b) return false;
-  if (a.id && b.id) return a.id === b.id;
-  return a.name === b.name && a.dueDate === b.dueDate;
-}
-
-function isItemCompleted(classObj, sourceKey, item) {
-  return classObj.completed.some((done) => {
-    return Boolean(done.sourceId && item.id && done.sourceId === item.id);
-  });
-}
-
-function markItemDone(classObj, sourceKey, selectedItem) {
-  const list = classObj[sourceKey];
-  const item =
-    list.find((entry) => sameItem(entry, selectedItem)) ||
-    list.find((entry) => entry.name === selectedItem.name && entry.dueDate === selectedItem.dueDate);
+function markDone(cls, key, itemId) {
+  const item = cls[key].find((it) => it.id === itemId);
   if (!item) return;
 
-  classObj[sourceKey] = list.filter((entry) => !sameItem(entry, item));
-
-  if (isItemCompleted(classObj, sourceKey, item)) {
-    saveState();
-    renderDashboard();
-    renderCalendar();
-    renderCompleted();
-    return;
-  }
-
-  classObj.completed.push({
+  cls[key] = cls[key].filter((it) => it.id !== itemId);
+  cls.completed.push({
     id: makeId(),
     sourceId: item.id,
     name: item.name,
     dueDate: item.dueDate,
-    type: sourceKey === "quizzes" ? "quiz" : "assignment",
+    type: key === "quizzes" ? "quiz" : "assignment",
     completedAt: new Date().toISOString()
   });
 
   saveState();
-  renderDashboard();
-  renderCalendar();
-  renderCompleted();
+  renderAll();
 }
 
-function removeActiveItem(classObj, sourceKey, itemId) {
-  classObj[sourceKey] = classObj[sourceKey].filter((entry) => entry.id !== itemId);
-  saveState();
-  renderDashboard();
-  renderCalendar();
-}
-
-function createItemRow(item, typeLabel, onDone, onRemove) {
+function createItemRow(item, onDone, onRemove) {
   const li = document.createElement("li");
   li.innerHTML = `
     <span class="item-name">${item.name}</span>
-    <span class="due-date">${typeLabel}: ${formatDueDate(item.dueDate)}</span>
-    <button type="button" class="item-remove-btn" aria-label="Remove ${item.name}">Remove</button>
-    <button type="button" class="item-done-btn" aria-label="Mark ${item.name} as done">Done</button>
+    <span class="due-date">Due: ${formatDueDate(item.dueDate)}</span>
+    <button type="button" class="item-remove-btn">Remove</button>
+    <button type="button" class="item-done-btn">Done</button>
   `;
 
   const removeBtn = li.querySelector(".item-remove-btn");
+  const doneBtn = li.querySelector(".item-done-btn");
   if (removeBtn) {
     removeBtn.addEventListener("click", onRemove);
     addPressAnimation(removeBtn);
   }
-
-  const doneBtn = li.querySelector(".item-done-btn");
   if (doneBtn) {
     doneBtn.addEventListener("click", onDone);
     addPressAnimation(doneBtn);
@@ -330,67 +249,59 @@ function createItemRow(item, typeLabel, onDone, onRemove) {
 }
 
 function renderDashboard(focusClassId = null) {
+  if (!classesContainer || !classCardTemplate) return;
   classesContainer.innerHTML = "";
 
-  getCurrentUserData().classes.forEach((classObj, i) => {
-    const fragment = classCardTemplate.content.cloneNode(true);
-    const card = fragment.querySelector(".class-card");
-    const summaryBtn = fragment.querySelector(".class-summary");
-    const title = fragment.querySelector(".class-title");
-    const content = fragment.querySelector(".class-content");
-    const classNameInput = fragment.querySelector(".class-name-input");
-    const removeClassBtn = fragment.querySelector(".remove-class-btn");
-    const assignmentForm = fragment.querySelector(".assignment-form");
-    const quizForm = fragment.querySelector(".quiz-form");
-    const assignmentsList = fragment.querySelector(".assignments-list");
-    const quizzesList = fragment.querySelector(".quizzes-list");
+  currentUser().classes.forEach((cls, i) => {
+    const frag = classCardTemplate.content.cloneNode(true);
+    const card = frag.querySelector(".class-card");
+    const summaryBtn = frag.querySelector(".class-summary");
+    const title = frag.querySelector(".class-title");
+    const content = frag.querySelector(".class-content");
+    const nameInput = frag.querySelector(".class-name-input");
+    const removeClassBtn = frag.querySelector(".remove-class-btn");
+    const assignmentForm = frag.querySelector(".assignment-form");
+    const quizForm = frag.querySelector(".quiz-form");
+    const assignmentsList = frag.querySelector(".assignments-list");
+    const quizzesList = frag.querySelector(".quizzes-list");
 
     const fallback = `Class ${i + 1}`;
-    title.textContent = classObj.name || fallback;
-    classNameInput.value = classObj.name || fallback;
+    title.textContent = cls.name || fallback;
+    nameInput.value = cls.name || fallback;
 
-    if (focusClassId && classObj.id === focusClassId) {
-      classObj.collapsed = false;
-    }
-
-    if (!classObj.collapsed) {
+    if (focusClassId && cls.id === focusClassId) cls.collapsed = false;
+    if (!cls.collapsed) {
       card.classList.remove("collapsed");
       content.hidden = false;
       summaryBtn.setAttribute("aria-expanded", "true");
     }
 
     summaryBtn.addEventListener("click", () => {
-      classObj.collapsed = !classObj.collapsed;
-      const opening = card.classList.contains("collapsed");
-
-      if (opening) {
-        card.classList.remove("collapsed");
-        content.hidden = false;
-        summaryBtn.setAttribute("aria-expanded", "true");
-      } else {
-        summaryBtn.setAttribute("aria-expanded", "false");
+      cls.collapsed = !cls.collapsed;
+      if (cls.collapsed) {
         content.hidden = true;
         card.classList.add("collapsed");
+        summaryBtn.setAttribute("aria-expanded", "false");
+      } else {
+        content.hidden = false;
+        card.classList.remove("collapsed");
+        summaryBtn.setAttribute("aria-expanded", "true");
       }
       saveState();
     });
 
-    classNameInput.addEventListener("input", () => {
-      const value = classNameInput.value.trim();
-      classObj.name = value || fallback;
-      title.textContent = classObj.name;
+    nameInput.addEventListener("input", () => {
+      cls.name = nameInput.value.trim() || fallback;
+      title.textContent = cls.name;
       saveState();
       renderCalendar();
       renderCompleted();
     });
 
     removeClassBtn.addEventListener("click", () => {
-      const user = getCurrentUserData();
-      user.classes = user.classes.filter((entry) => entry.id !== classObj.id);
+      currentUser().classes = currentUser().classes.filter((entry) => entry.id !== cls.id);
       saveState();
-      renderDashboard();
-      renderCalendar();
-      renderCompleted();
+      renderAll();
     });
 
     assignmentForm.addEventListener("submit", (event) => {
@@ -400,11 +311,9 @@ function renderDashboard(focusClassId = null) {
       const dueDate = String(data.get("dueDate") || "").trim();
       if (!name || !dueDate) return;
 
-      classObj.assignments.push({ id: makeId(), name, dueDate });
-      assignmentForm.reset();
+      cls.assignments.push({ id: makeId(), name, dueDate });
       saveState();
-      renderDashboard();
-      renderCalendar();
+      renderAll();
     });
 
     quizForm.addEventListener("submit", (event) => {
@@ -414,46 +323,30 @@ function renderDashboard(focusClassId = null) {
       const dueDate = String(data.get("dueDate") || "").trim();
       if (!name || !dueDate) return;
 
-      classObj.quizzes.push({ id: makeId(), name, dueDate });
-      quizForm.reset();
+      cls.quizzes.push({ id: makeId(), name, dueDate });
       saveState();
-      renderDashboard();
-      renderCalendar();
+      renderAll();
     });
 
-    classObj.assignments
-      .filter((item) => !isItemCompleted(classObj, "assignments", item))
-      .forEach((item) => {
+    cls.assignments.forEach((item) => {
       assignmentsList.appendChild(
-        createItemRow(
-          item,
-          "Due",
-          () => markItemDone(classObj, "assignments", item),
-          () => removeActiveItem(classObj, "assignments", item.id)
-        )
+        createItemRow(item, () => markDone(cls, "assignments", item.id), () => removeItem(cls, "assignments", item.id))
       );
-      });
+    });
 
-    classObj.quizzes
-      .filter((item) => !isItemCompleted(classObj, "quizzes", item))
-      .forEach((item) => {
+    cls.quizzes.forEach((item) => {
       quizzesList.appendChild(
-        createItemRow(
-          item,
-          "Due",
-          () => markItemDone(classObj, "quizzes", item),
-          () => removeActiveItem(classObj, "quizzes", item.id)
-        )
+        createItemRow(item, () => markDone(cls, "quizzes", item.id), () => removeItem(cls, "quizzes", item.id))
       );
-      });
+    });
 
     addPressAnimation(summaryBtn);
     addPressAnimation(removeClassBtn);
 
-    classesContainer.appendChild(fragment);
-    if (classesContainer.lastElementChild) {
-      const mountedCard = classesContainer.lastElementChild;
-      mountedCard.dataset.classId = classObj.id;
+    classesContainer.appendChild(frag);
+    const mountedCard = classesContainer.lastElementChild;
+    if (mountedCard) {
+      mountedCard.dataset.classId = cls.id;
       addCardTilt(mountedCard);
     }
   });
@@ -471,7 +364,7 @@ function renderDashboard(focusClassId = null) {
 function renderCalendar() {
   if (!calendarGrid || !calendarMonthLabel) return;
 
-  const items = allDueItems();
+  const items = dueItems();
   const map = new Map();
   items.forEach((item) => {
     if (!map.has(item.dueDate)) map.set(item.dueDate, []);
@@ -484,25 +377,21 @@ function renderCalendar() {
   const lastDay = new Date(year, month + 1, 0);
   const prevLastDay = new Date(year, month, 0);
 
-  calendarMonthLabel.textContent = firstDay.toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric"
-  });
+  calendarMonthLabel.textContent = firstDay.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
   calendarGrid.innerHTML = "";
   dayLabels.forEach((label) => {
-    const div = document.createElement("div");
-    div.className = "day-header";
-    div.textContent = label;
-    calendarGrid.appendChild(div);
+    const el = document.createElement("div");
+    el.className = "day-header";
+    el.textContent = label;
+    calendarGrid.appendChild(el);
   });
 
   const startOffset = firstDay.getDay();
   const daysInMonth = lastDay.getDate();
-  const prevMonthDays = prevLastDay.getDate();
 
   for (let i = startOffset - 1; i >= 0; i -= 1) {
-    const dayNum = prevMonthDays - i;
+    const dayNum = prevLastDay.getDate() - i;
     const cell = document.createElement("article");
     cell.className = "calendar-cell muted";
     cell.innerHTML = `<div class="calendar-date">${dayNum}</div><ul class="calendar-items"></ul>`;
@@ -510,27 +399,17 @@ function renderCalendar() {
   }
 
   for (let day = 1; day <= daysInMonth; day += 1) {
-    const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const dayItems = map.get(dateKey) || [];
+    const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const dayItems = map.get(key) || [];
 
     const cell = document.createElement("article");
     cell.className = "calendar-cell";
-
     const listMarkup = dayItems
       .slice(0, 3)
-      .map((item) => {
-        const typeClass = item.type === "quiz" ? "quiz" : "assignment";
-        return `<li class="${typeClass}">${item.className}: ${item.name}</li>`;
-      })
+      .map((item) => `<li class="${item.type === "quiz" ? "quiz" : "assignment"}">${item.className}: ${item.name}</li>`)
       .join("");
-
-    const moreCount = dayItems.length > 3 ? `<li>+${dayItems.length - 3} more</li>` : "";
-
-    cell.innerHTML = `
-      <div class="calendar-date">${day}</div>
-      <ul class="calendar-items">${listMarkup}${moreCount}</ul>
-    `;
-
+    const more = dayItems.length > 3 ? `<li>+${dayItems.length - 3} more</li>` : "";
+    cell.innerHTML = `<div class="calendar-date">${day}</div><ul class="calendar-items">${listMarkup}${more}</ul>`;
     calendarGrid.appendChild(cell);
   }
 
@@ -554,11 +433,11 @@ function renderCalendar() {
 function renderCompleted() {
   if (!completedList || !completedCounter) return;
 
-  const completedItems = allCompletedItems();
-  completedCounter.textContent = `${completedItems.length} completed`;
+  const items = doneItems();
+  completedCounter.textContent = `${items.length} completed`;
   completedList.innerHTML = "";
 
-  if (completedItems.length === 0) {
+  if (items.length === 0) {
     const empty = document.createElement("li");
     empty.className = "empty-calendar";
     empty.textContent = "No completed assignments yet.";
@@ -566,7 +445,7 @@ function renderCompleted() {
     return;
   }
 
-  completedItems.forEach((item) => {
+  items.forEach((item) => {
     const li = document.createElement("li");
     li.className = "completed-item";
     li.innerHTML = `
@@ -578,37 +457,34 @@ function renderCompleted() {
   });
 }
 
-function setView(viewName) {
-  const normalizedView =
-    viewName === "dashboard" || viewName === "calendar" || viewName === "completed"
-      ? viewName
-      : "dashboard";
-  state.currentView = normalizedView;
+function setView(next) {
+  const view = ["dashboard", "calendar", "completed"].includes(next) ? next : "dashboard";
+  state.currentView = view;
 
-  const showDashboard = normalizedView === "dashboard";
-  const showCalendar = normalizedView === "calendar";
-  const showCompleted = normalizedView === "completed";
+  const showDashboard = view === "dashboard";
+  const showCalendar = view === "calendar";
+  const showCompleted = view === "completed";
 
-  if (dashboardView) dashboardView.hidden = !showDashboard;
-  if (calendarView) calendarView.hidden = !showCalendar;
-  if (completedView) completedView.hidden = !showCompleted;
-
-  if (dashboardView) dashboardView.classList.toggle("active", showDashboard);
-  if (calendarView) calendarView.classList.toggle("active", showCalendar);
-  if (completedView) completedView.classList.toggle("active", showCompleted);
+  if (dashboardView) {
+    dashboardView.hidden = !showDashboard;
+    dashboardView.classList.toggle("active", showDashboard);
+  }
+  if (calendarView) {
+    calendarView.hidden = !showCalendar;
+    calendarView.classList.toggle("active", showCalendar);
+  }
+  if (completedView) {
+    completedView.hidden = !showCompleted;
+    completedView.classList.toggle("active", showCompleted);
+  }
 
   if (navDashboard) navDashboard.classList.toggle("active", showDashboard);
   if (navCalendar) navCalendar.classList.toggle("active", showCalendar);
   if (navCompleted) navCompleted.classList.toggle("active", showCompleted);
 
   if (pageTitle) {
-    pageTitle.textContent = showDashboard
-      ? "My Classes"
-      : showCalendar
-        ? "Due Date Calendar"
-        : "Completed Assignments";
+    pageTitle.textContent = showDashboard ? "My Classes" : showCalendar ? "Due Date Calendar" : "Completed Assignments";
   }
-
   if (pageSubtitle) {
     pageSubtitle.textContent = showDashboard
       ? "Track assignments and quizzes by class"
@@ -617,9 +493,14 @@ function setView(viewName) {
         : "Assignments and quizzes you marked done";
   }
 
-  addClassBtn.style.display = showDashboard ? "inline-block" : "none";
-
+  if (addClassBtn) addClassBtn.style.display = showDashboard ? "inline-block" : "none";
   saveState();
+}
+
+function renderAll(focusClassId = null) {
+  renderDashboard(focusClassId);
+  renderCalendar();
+  renderCompleted();
 }
 
 if (navDashboard) {
@@ -661,29 +542,27 @@ if (nextMonthBtn) {
   addPressAnimation(nextMonthBtn);
 }
 
-addClassBtn.addEventListener("click", () => {
-  const user = getCurrentUserData();
-  const newClassId = makeId();
+if (addClassBtn) {
+  addClassBtn.addEventListener("click", () => {
+    const user = currentUser();
+    const classId = makeId();
 
-  user.classes.push({
-    id: newClassId,
-    name: `Class ${user.classes.length + 1}`,
-    collapsed: false,
-    assignments: [],
-    quizzes: [],
-    completed: []
+    user.classes.push({
+      id: classId,
+      name: `Class ${user.classes.length + 1}`,
+      collapsed: false,
+      assignments: [],
+      quizzes: [],
+      completed: []
+    });
+
+    saveState();
+    setView("dashboard");
+    renderAll(classId);
   });
+  addPressAnimation(addClassBtn);
+}
 
-  saveState();
-  setView("dashboard");
-  renderDashboard(newClassId);
-  renderCalendar();
-  renderCompleted();
-});
-addPressAnimation(addClassBtn);
-
-getCurrentUserData();
+currentUser();
 setView(state.currentView || "dashboard");
-renderDashboard();
-renderCalendar();
-renderCompleted();
+renderAll();
