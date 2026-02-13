@@ -1,9 +1,6 @@
 :root {
   --bg-1: #060708;
   --bg-2: #0c1017;
-  --panel: rgba(20, 24, 33, 0.8);
-  --panel-solid: #121722;
-  --panel-2: #181f2d;
   --border: rgba(137, 159, 196, 0.3);
   --text: #eef3ff;
   --muted: #9aa9c2;
@@ -33,6 +30,58 @@ body {
     linear-gradient(180deg, var(--bg-2), var(--bg-1));
 }
 
+.app-shell {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(10, 15, 24, 0.95), rgba(12, 18, 29, 0.88));
+  padding: 1.1rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.brand p {
+  margin: 0.35rem 0 1rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.nav-btn {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  background: rgba(15, 21, 32, 0.95);
+  color: var(--text);
+  text-align: left;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nav-btn.active {
+  border-color: rgba(53, 184, 255, 0.65);
+  background: linear-gradient(135deg, rgba(30, 98, 152, 0.55), rgba(18, 54, 88, 0.5));
+}
+
+.main-content {
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
 .topbar {
   background: linear-gradient(120deg, rgba(15, 22, 34, 0.95), rgba(22, 30, 46, 0.88));
   border-bottom: 1px solid var(--border);
@@ -47,10 +96,9 @@ body {
   z-index: 20;
 }
 
-.topbar h1 {
+.topbar h2 {
   margin: 0;
-  font-size: 1.4rem;
-  letter-spacing: 0.3px;
+  font-size: 1.3rem;
 }
 
 .topbar p {
@@ -62,9 +110,11 @@ body {
 .add-class-btn,
 .class-summary,
 .remove-class-btn,
-.item-form button {
+.item-form button,
+.month-btn {
   position: relative;
   overflow: hidden;
+  border-radius: 8px;
 }
 
 .add-class-btn {
@@ -78,26 +128,22 @@ body {
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 8px 22px rgba(23, 121, 204, 0.45);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-}
-
-.add-class-btn:hover {
-  transform: translateY(-2px) scale(1.04);
-  box-shadow: 0 12px 28px rgba(53, 184, 255, 0.55);
-  filter: brightness(1.06);
 }
 
 .add-class-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
-main {
+.view {
   max-width: 1080px;
+  width: 100%;
   margin: 1rem auto 2rem;
   padding: 0 1rem;
+}
+
+.view:not(.active) {
+  display: none;
 }
 
 .dashboard-header {
@@ -105,6 +151,11 @@ main {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.75rem;
+}
+
+.dashboard-header h3,
+.calendar-header h3 {
+  margin: 0;
 }
 
 .counter {
@@ -119,13 +170,6 @@ main {
   margin-bottom: 1rem;
   background: linear-gradient(160deg, rgba(24, 31, 45, 0.92), rgba(18, 24, 36, 0.86));
   box-shadow: var(--shadow-lg);
-  transform-style: preserve-3d;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.class-card:hover {
-  border-color: rgba(116, 255, 211, 0.45);
-  box-shadow: 0 26px 46px rgba(0, 0, 0, 0.58);
 }
 
 .class-summary {
@@ -141,11 +185,6 @@ main {
   cursor: pointer;
   color: var(--text);
   font-weight: 700;
-  transition: filter 0.2s ease;
-}
-
-.class-summary:hover {
-  filter: brightness(1.07);
 }
 
 .class-card.collapsed .chevron {
@@ -188,30 +227,16 @@ main {
   background: rgba(8, 12, 20, 0.95);
   color: var(--text);
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.class-meta input:focus,
-.item-form input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(53, 184, 255, 0.2);
 }
 
 .remove-class-btn {
   background: rgba(255, 110, 127, 0.1);
   color: #ff95a1;
   border: 1px solid rgba(255, 110, 127, 0.45);
-  border-radius: 8px;
   padding: 0.6rem 0.9rem;
   height: fit-content;
   margin-top: auto;
   cursor: pointer;
-  transition: transform 0.2s ease, background 0.2s ease;
-}
-
-.remove-class-btn:hover {
-  background: rgba(255, 110, 127, 0.18);
-  transform: translateY(-1px);
 }
 
 .grade-grid {
@@ -227,7 +252,7 @@ main {
   background: linear-gradient(160deg, rgba(16, 22, 33, 0.96), rgba(13, 18, 28, 0.92));
 }
 
-.grade-panel h3 {
+.grade-panel h4 {
   margin-top: 0;
   color: #d8ecff;
   border-bottom: 1px solid var(--border);
@@ -241,19 +266,13 @@ main {
   margin-bottom: 0.6rem;
 }
 
-.item-form button {
+.item-form button,
+.month-btn {
   padding: 0.5rem 0.75rem;
-  border-radius: 8px;
   border: 1px solid rgba(53, 184, 255, 0.5);
   background: linear-gradient(135deg, #1f74c0, #12518a);
   color: #eef7ff;
   cursor: pointer;
-  transition: transform 0.2s ease, filter 0.2s ease;
-}
-
-.item-form button:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.1);
 }
 
 .item-list {
@@ -273,13 +292,6 @@ main {
   border-left: 4px solid #39c9ff;
   border-radius: 8px;
   padding: 0.55rem 0.7rem;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.item-list li:hover {
-  transform: translateY(-2px);
-  border-color: rgba(116, 255, 211, 0.55);
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
 }
 
 .item-list .due-date {
@@ -293,47 +305,83 @@ main {
   font-weight: 600;
 }
 
-.ripple {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  pointer-events: none;
-  transform: translate(-50%, -50%) scale(0);
-  animation: ripple-grow 420ms ease-out forwards;
-  background: rgba(255, 255, 255, 0.34);
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.7rem;
 }
 
-.card-enter {
-  opacity: 0;
-  transform: translateY(14px) scale(0.985);
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.55rem;
 }
 
-.card-enter-visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  transition: opacity 260ms ease, transform 260ms ease;
+.day-header {
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent-2);
+  padding: 0.35rem;
 }
 
-.new-item {
-  animation: item-pop 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+.calendar-cell {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(9, 14, 22, 0.9);
+  min-height: 122px;
+  padding: 0.45rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.35rem;
 }
 
-@keyframes ripple-grow {
-  to {
-    transform: translate(-50%, -50%) scale(16);
-    opacity: 0;
+.calendar-cell.muted {
+  opacity: 0.45;
+}
+
+.calendar-date {
+  font-weight: 700;
+}
+
+.calendar-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.calendar-items li {
+  border-left: 3px solid var(--accent);
+  background: rgba(18, 29, 42, 0.95);
+  padding: 0.28rem 0.35rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.calendar-items li.quiz {
+  border-left-color: var(--accent-2);
+}
+
+.empty-calendar {
+  text-align: center;
+  color: var(--muted);
+  padding: 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 960px) {
+  .app-shell {
+    grid-template-columns: 1fr;
   }
-}
 
-@keyframes item-pop {
-  0% {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+  .sidebar {
+    position: static;
+    height: auto;
   }
 }
 
@@ -344,5 +392,13 @@ main {
 
   .item-form {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .day-header {
+    display: none;
   }
 }
