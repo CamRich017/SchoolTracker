@@ -344,7 +344,7 @@ function setView(viewName) {
   if (pageSubtitle) {
     pageSubtitle.textContent = showDashboard
       ? "Track assignments and quizzes by class"
-      : "Google Classroom-style monthly due date view";
+      : "View all upcoming due dates in a calendar format";
   }
   addClassBtn.style.display = showDashboard ? "inline-block" : "none";
 
