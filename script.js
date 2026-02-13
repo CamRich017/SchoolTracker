@@ -114,6 +114,31 @@ function normalizeClassData(classObj, index) {
   };
 }
 
+function migrateCompletedReferences(user) {
+  let changed = false;
+  user.classes.forEach((classObj) => {
+    const activeByType = {
+      assignment: classObj.assignments,
+      quiz: classObj.quizzes
+    };
+
+    classObj.completed.forEach((done) => {
+      if (done.sourceId) return;
+      const list = activeByType[done.type] || [];
+      const match = list.find((item) => item.name === done.name && item.dueDate === done.dueDate);
+      if (!match) return;
+      done.sourceId = match.id;
+      changed = true;
+      if (done.type === "quiz") {
+        classObj.quizzes = classObj.quizzes.filter((entry) => entry.id !== match.id);
+      } else {
+        classObj.assignments = classObj.assignments.filter((entry) => entry.id !== match.id);
+      }
+    });
+  });
+  return changed;
+}
+
 function saveState() {
   storageSet(STORAGE_KEY, JSON.stringify(state));
 }
@@ -125,6 +150,8 @@ function getCurrentUserData() {
 
   const user = state.users[browserUserId];
   user.classes = (Array.isArray(user.classes) ? user.classes : []).map(normalizeClassData);
+  const changed = migrateCompletedReferences(user);
+  if (changed) saveState();
   return user;
 }
 
@@ -218,10 +245,8 @@ function sameItem(a, b) {
 }
 
 function isItemCompleted(classObj, sourceKey, item) {
-  const type = sourceKey === "quizzes" ? "quiz" : "assignment";
   return classObj.completed.some((done) => {
-    if (done.sourceId && item.id) return done.sourceId === item.id;
-    return done.type === type && done.name === item.name && done.dueDate === item.dueDate;
+    return Boolean(done.sourceId && item.id && done.sourceId === item.id);
   });
 }
 
