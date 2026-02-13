@@ -20,6 +20,23 @@ const prevMonthBtn = document.getElementById("prevMonthBtn");
 const nextMonthBtn = document.getElementById("nextMonthBtn");
 
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const memoryStore = {};
+
+function storageGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (err) {
+    return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    memoryStore[key] = value;
+  }
+}
 
 function makeId() {
   if (window.crypto && typeof window.crypto.randomUUID === "function") {
@@ -29,10 +46,10 @@ function makeId() {
 }
 
 function getBrowserUserId() {
-  const existing = localStorage.getItem(BROWSER_USER_KEY);
+  const existing = storageGet(BROWSER_USER_KEY);
   if (existing) return existing;
   const next = makeId();
-  localStorage.setItem(BROWSER_USER_KEY, next);
+  storageSet(BROWSER_USER_KEY, next);
   return next;
 }
 
@@ -48,7 +65,7 @@ function buildDefaultState() {
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = storageGet(STORAGE_KEY);
     if (!raw) return buildDefaultState();
     const parsed = JSON.parse(raw);
     return {
@@ -71,7 +88,7 @@ function getCurrentUserData() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  storageSet(STORAGE_KEY, JSON.stringify(state));
 }
 
 function formatDueDate(rawDate) {
