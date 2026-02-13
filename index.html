@@ -17,6 +17,7 @@
         <nav class="sidebar-nav" aria-label="Main navigation">
           <button id="navDashboard" class="nav-btn active" type="button">Dashboard</button>
           <button id="navCalendar" class="nav-btn" type="button">Calendar</button>
+          <button id="navCompleted" class="nav-btn" type="button">Completed</button>
         </nav>
       </aside>
 
@@ -47,6 +48,14 @@
           </section>
 
           <div class="calendar-grid" id="calendarGrid"></div>
+        </section>
+
+        <section id="completedView" class="view" aria-label="Completed assignments view" hidden>
+          <section class="dashboard-header">
+            <h3>Completed Assignments</h3>
+            <span id="completedCounter" class="counter">0 completed</span>
+          </section>
+          <ul id="completedList" class="completed-list"></ul>
         </section>
       </main>
     </div>

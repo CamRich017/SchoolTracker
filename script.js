@@ -10,14 +10,21 @@ const classCardTemplate = document.getElementById("classCardTemplate");
 
 const navDashboard = document.getElementById("navDashboard");
 const navCalendar = document.getElementById("navCalendar");
+const navCompleted = document.getElementById("navCompleted");
+
 const dashboardView = document.getElementById("dashboardView");
 const calendarView = document.getElementById("calendarView");
+const completedView = document.getElementById("completedView");
+
 const pageTitle = document.getElementById("pageTitle");
 const pageSubtitle = document.getElementById("pageSubtitle");
 const calendarGrid = document.getElementById("calendarGrid");
 const calendarMonthLabel = document.getElementById("calendarMonthLabel");
 const prevMonthBtn = document.getElementById("prevMonthBtn");
 const nextMonthBtn = document.getElementById("nextMonthBtn");
+
+const completedList = document.getElementById("completedList");
+const completedCounter = document.getElementById("completedCounter");
 
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const memoryStore = {};
@@ -80,20 +87,64 @@ function loadState() {
 const state = loadState();
 const browserUserId = getBrowserUserId();
 
-function getCurrentUserData() {
-  if (!state.users[browserUserId]) {
-    state.users[browserUserId] = { classes: [] };
-  }
-  return state.users[browserUserId];
+function normalizeClassData(classObj, index) {
+  const fallback = `Class ${index + 1}`;
+  return {
+    id: classObj.id || makeId(),
+    name: classObj.name || fallback,
+    collapsed: Boolean(classObj.collapsed),
+    assignments: Array.isArray(classObj.assignments) ? classObj.assignments : [],
+    quizzes: Array.isArray(classObj.quizzes) ? classObj.quizzes : [],
+    completed: Array.isArray(classObj.completed) ? classObj.completed : []
+  };
 }
 
 function saveState() {
   storageSet(STORAGE_KEY, JSON.stringify(state));
 }
 
+function getCurrentUserData() {
+  if (!state.users[browserUserId]) {
+    state.users[browserUserId] = { classes: [] };
+  }
+
+  const user = state.users[browserUserId];
+  user.classes = (Array.isArray(user.classes) ? user.classes : []).map(normalizeClassData);
+  return user;
+}
+
 function formatDueDate(rawDate) {
   const date = new Date(`${rawDate}T00:00:00`);
   return Number.isNaN(date.getTime()) ? rawDate : date.toLocaleDateString();
+}
+
+function addCardTilt(card) {
+  if (!window.matchMedia("(hover: hover)").matches) return;
+
+  card.addEventListener("pointermove", (event) => {
+    const rect = card.getBoundingClientRect();
+    const offsetX = (event.clientX - rect.left) / rect.width - 0.5;
+    const offsetY = (event.clientY - rect.top) / rect.height - 0.5;
+
+    const rotateY = offsetX * 1.1;
+    const rotateX = offsetY * -0.9;
+
+    card.style.transform = `perspective(1200px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+  });
+
+  card.addEventListener("pointerleave", () => {
+    card.style.transform = "perspective(1200px) rotateX(0deg) rotateY(0deg)";
+  });
+}
+
+function addPressAnimation(element) {
+  if (!element) return;
+  element.addEventListener("click", () => {
+    element.animate(
+      [{ transform: "scale(1)" }, { transform: "scale(0.985)" }, { transform: "scale(1)" }],
+      { duration: 140, easing: "ease-out" }
+    );
+  });
 }
 
 function allDueItems() {
@@ -112,6 +163,27 @@ function allDueItems() {
   return items;
 }
 
+function allCompletedItems() {
+  const user = getCurrentUserData();
+  const items = [];
+
+  user.classes.forEach((classObj) => {
+    classObj.completed.forEach((item) => {
+      items.push({
+        ...item,
+        classId: classObj.id,
+        className: classObj.name
+      });
+    });
+  });
+
+  return items.sort((a, b) => {
+    const aTime = new Date(a.completedAt || 0).getTime();
+    const bTime = new Date(b.completedAt || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
 function updateCounter() {
   const total = getCurrentUserData().classes.length;
   classCounter.textContent = `${total} / ${MAX_CLASSES} classes`;
@@ -120,17 +192,41 @@ function updateCounter() {
   maxNotice.textContent = atMax ? "You reached the maximum of 8 classes." : "";
 }
 
-function createItemRow(item, typeLabel, onRemove) {
+function markItemDone(classObj, sourceKey, itemId) {
+  const list = classObj[sourceKey];
+  const item = list.find((entry) => entry.id === itemId);
+  if (!item) return;
+
+  classObj[sourceKey] = list.filter((entry) => entry.id !== itemId);
+  classObj.completed.push({
+    id: makeId(),
+    sourceId: item.id,
+    name: item.name,
+    dueDate: item.dueDate,
+    type: sourceKey === "quizzes" ? "quiz" : "assignment",
+    completedAt: new Date().toISOString()
+  });
+
+  saveState();
+  renderDashboard();
+  renderCalendar();
+  renderCompleted();
+}
+
+function createItemRow(item, typeLabel, onDone) {
   const li = document.createElement("li");
   li.innerHTML = `
     <span class="item-name">${item.name}</span>
     <span class="due-date">${typeLabel}: ${formatDueDate(item.dueDate)}</span>
-    <button type="button" class="item-remove-btn" aria-label="Remove ${item.name}">Remove</button>
+    <button type="button" class="item-done-btn" aria-label="Mark ${item.name} as done">Done</button>
   `;
-  const removeBtn = li.querySelector(".item-remove-btn");
-  if (removeBtn) {
-    removeBtn.addEventListener("click", onRemove);
+
+  const doneBtn = li.querySelector(".item-done-btn");
+  if (doneBtn) {
+    doneBtn.addEventListener("click", onDone);
+    addPressAnimation(doneBtn);
   }
+
   return li;
 }
 
@@ -182,6 +278,7 @@ function renderDashboard() {
       title.textContent = classObj.name;
       saveState();
       renderCalendar();
+      renderCompleted();
     });
 
     removeClassBtn.addEventListener("click", () => {
@@ -190,6 +287,7 @@ function renderDashboard() {
       saveState();
       renderDashboard();
       renderCalendar();
+      renderCompleted();
     });
 
     assignmentForm.addEventListener("submit", (event) => {
@@ -200,6 +298,7 @@ function renderDashboard() {
       if (!name || !dueDate) return;
 
       classObj.assignments.push({ id: makeId(), name, dueDate });
+      assignmentForm.reset();
       saveState();
       renderDashboard();
       renderCalendar();
@@ -213,6 +312,7 @@ function renderDashboard() {
       if (!name || !dueDate) return;
 
       classObj.quizzes.push({ id: makeId(), name, dueDate });
+      quizForm.reset();
       saveState();
       renderDashboard();
       renderCalendar();
@@ -220,27 +320,21 @@ function renderDashboard() {
 
     classObj.assignments.forEach((item) => {
       assignmentsList.appendChild(
-        createItemRow(item, "Due", () => {
-          classObj.assignments = classObj.assignments.filter((entry) => entry.id !== item.id);
-          saveState();
-          renderDashboard();
-          renderCalendar();
-        })
+        createItemRow(item, "Due", () => markItemDone(classObj, "assignments", item.id))
       );
     });
 
     classObj.quizzes.forEach((item) => {
-      quizzesList.appendChild(
-        createItemRow(item, "Due", () => {
-          classObj.quizzes = classObj.quizzes.filter((entry) => entry.id !== item.id);
-          saveState();
-          renderDashboard();
-          renderCalendar();
-        })
-      );
+      quizzesList.appendChild(createItemRow(item, "Due", () => markItemDone(classObj, "quizzes", item.id)));
     });
 
+    addPressAnimation(summaryBtn);
+    addPressAnimation(removeClassBtn);
+
     classesContainer.appendChild(fragment);
+    if (classesContainer.lastElementChild) {
+      addCardTilt(classesContainer.lastElementChild);
+    }
   });
 
   updateCounter();
@@ -329,30 +423,85 @@ function renderCalendar() {
   }
 }
 
+function renderCompleted() {
+  if (!completedList || !completedCounter) return;
+
+  const completedItems = allCompletedItems();
+  completedCounter.textContent = `${completedItems.length} completed`;
+  completedList.innerHTML = "";
+
+  if (completedItems.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "empty-calendar";
+    empty.textContent = "No completed assignments yet.";
+    completedList.appendChild(empty);
+    return;
+  }
+
+  completedItems.forEach((item) => {
+    const li = document.createElement("li");
+    li.className = "completed-item";
+    li.innerHTML = `
+      <span class="completed-name">${item.className}: ${item.name}</span>
+      <span class="completed-meta">${item.type === "quiz" ? "Quiz/Test" : "Assignment"} | Due ${formatDueDate(item.dueDate)}</span>
+      <span class="completed-meta">Done ${new Date(item.completedAt).toLocaleDateString()}</span>
+    `;
+    completedList.appendChild(li);
+  });
+}
+
 function setView(viewName) {
   state.currentView = viewName;
 
   const showDashboard = viewName === "dashboard";
-  if (dashboardView) dashboardView.hidden = !showDashboard;
-  if (calendarView) calendarView.hidden = showDashboard;
-  if (dashboardView) dashboardView.classList.toggle("active", showDashboard);
-  if (calendarView) calendarView.classList.toggle("active", !showDashboard);
-  if (navDashboard) navDashboard.classList.toggle("active", showDashboard);
-  if (navCalendar) navCalendar.classList.toggle("active", !showDashboard);
+  const showCalendar = viewName === "calendar";
+  const showCompleted = viewName === "completed";
 
-  if (pageTitle) pageTitle.textContent = showDashboard ? "My Classes" : "Due Date Calendar";
+  if (dashboardView) dashboardView.hidden = !showDashboard;
+  if (calendarView) calendarView.hidden = !showCalendar;
+  if (completedView) completedView.hidden = !showCompleted;
+
+  if (dashboardView) dashboardView.classList.toggle("active", showDashboard);
+  if (calendarView) calendarView.classList.toggle("active", showCalendar);
+  if (completedView) completedView.classList.toggle("active", showCompleted);
+
+  if (navDashboard) navDashboard.classList.toggle("active", showDashboard);
+  if (navCalendar) navCalendar.classList.toggle("active", showCalendar);
+  if (navCompleted) navCompleted.classList.toggle("active", showCompleted);
+
+  if (pageTitle) {
+    pageTitle.textContent = showDashboard
+      ? "My Classes"
+      : showCalendar
+        ? "Due Date Calendar"
+        : "Completed Assignments";
+  }
+
   if (pageSubtitle) {
     pageSubtitle.textContent = showDashboard
       ? "Track assignments and quizzes by class"
-      : "View all upcoming due dates in a calendar format";
+      : showCalendar
+        ? "View all upcoming due dates in a calendar format"
+        : "Assignments and quizzes you marked done";
   }
+
   addClassBtn.style.display = showDashboard ? "inline-block" : "none";
 
   saveState();
 }
 
-if (navDashboard) navDashboard.addEventListener("click", () => setView("dashboard"));
-if (navCalendar) navCalendar.addEventListener("click", () => setView("calendar"));
+if (navDashboard) {
+  navDashboard.addEventListener("click", () => setView("dashboard"));
+  addPressAnimation(navDashboard);
+}
+if (navCalendar) {
+  navCalendar.addEventListener("click", () => setView("calendar"));
+  addPressAnimation(navCalendar);
+}
+if (navCompleted) {
+  navCompleted.addEventListener("click", () => setView("completed"));
+  addPressAnimation(navCompleted);
+}
 
 if (prevMonthBtn) {
   prevMonthBtn.addEventListener("click", () => {
@@ -364,6 +513,7 @@ if (prevMonthBtn) {
     saveState();
     renderCalendar();
   });
+  addPressAnimation(prevMonthBtn);
 }
 
 if (nextMonthBtn) {
@@ -376,6 +526,7 @@ if (nextMonthBtn) {
     saveState();
     renderCalendar();
   });
+  addPressAnimation(nextMonthBtn);
 }
 
 addClassBtn.addEventListener("click", () => {
@@ -385,21 +536,24 @@ addClassBtn.addEventListener("click", () => {
     return;
   }
 
-  const fallback = `Class ${user.classes.length + 1}`;
   user.classes.push({
     id: makeId(),
-    name: fallback,
+    name: `Class ${user.classes.length + 1}`,
     collapsed: true,
     assignments: [],
-    quizzes: []
+    quizzes: [],
+    completed: []
   });
 
   saveState();
   renderDashboard();
   renderCalendar();
+  renderCompleted();
 });
+addPressAnimation(addClassBtn);
 
 getCurrentUserData();
 setView(state.currentView || "dashboard");
 renderDashboard();
 renderCalendar();
+renderCompleted();
