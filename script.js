@@ -75,10 +75,23 @@ function loadState() {
     const raw = storageGet(STORAGE_KEY);
     if (!raw) return buildDefaultState();
     const parsed = JSON.parse(raw);
-    return {
+    const merged = {
       ...buildDefaultState(),
       ...parsed
     };
+    if (!merged.users || typeof merged.users !== "object" || Array.isArray(merged.users)) {
+      merged.users = {};
+    }
+    if (!["dashboard", "calendar", "completed"].includes(merged.currentView)) {
+      merged.currentView = "dashboard";
+    }
+    if (!Number.isInteger(merged.calendarMonth) || merged.calendarMonth < 0 || merged.calendarMonth > 11) {
+      merged.calendarMonth = new Date().getMonth();
+    }
+    if (!Number.isInteger(merged.calendarYear) || merged.calendarYear < 1970) {
+      merged.calendarYear = new Date().getFullYear();
+    }
+    return merged;
   } catch (err) {
     return buildDefaultState();
   }
@@ -144,6 +157,10 @@ function saveState() {
 }
 
 function getCurrentUserData() {
+  if (!state.users || typeof state.users !== "object" || Array.isArray(state.users)) {
+    state.users = {};
+  }
+
   if (!state.users[browserUserId]) {
     state.users[browserUserId] = { classes: [] };
   }
