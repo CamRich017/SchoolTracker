@@ -329,7 +329,7 @@ function createItemRow(item, typeLabel, onDone, onRemove) {
   return li;
 }
 
-function renderDashboard() {
+function renderDashboard(focusClassId = null) {
   classesContainer.innerHTML = "";
 
   getCurrentUserData().classes.forEach((classObj, i) => {
@@ -348,6 +348,10 @@ function renderDashboard() {
     const fallback = `Class ${i + 1}`;
     title.textContent = classObj.name || fallback;
     classNameInput.value = classObj.name || fallback;
+
+    if (focusClassId && classObj.id === focusClassId) {
+      classObj.collapsed = false;
+    }
 
     if (!classObj.collapsed) {
       card.classList.remove("collapsed");
@@ -448,11 +452,20 @@ function renderDashboard() {
 
     classesContainer.appendChild(fragment);
     if (classesContainer.lastElementChild) {
-      addCardTilt(classesContainer.lastElementChild);
+      const mountedCard = classesContainer.lastElementChild;
+      mountedCard.dataset.classId = classObj.id;
+      addCardTilt(mountedCard);
     }
   });
 
   updateCounter();
+
+  if (focusClassId) {
+    const focusCard = classesContainer.querySelector(`[data-class-id="${focusClassId}"]`);
+    if (focusCard) {
+      focusCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }
 }
 
 function renderCalendar() {
@@ -650,11 +663,12 @@ if (nextMonthBtn) {
 
 addClassBtn.addEventListener("click", () => {
   const user = getCurrentUserData();
+  const newClassId = makeId();
 
   user.classes.push({
-    id: makeId(),
+    id: newClassId,
     name: `Class ${user.classes.length + 1}`,
-    collapsed: true,
+    collapsed: false,
     assignments: [],
     quizzes: [],
     completed: []
@@ -662,7 +676,7 @@ addClassBtn.addEventListener("click", () => {
 
   saveState();
   setView("dashboard");
-  renderDashboard();
+  renderDashboard(newClassId);
   renderCalendar();
   renderCompleted();
 });
