@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Assignment Tracker</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Assignment Tracker</h1>
+        <p>Infinite Campus-inspired class dashboard</p>
+      </div>
+      <button id="addClassBtn" class="add-class-btn" aria-label="Add class">+</button>
+    </header>
+
+    <main>
+      <section class="dashboard-header">
+        <h2>My Classes</h2>
+        <span id="classCounter" class="counter">0 / 8 classes</span>
+      </section>
+
+      <section id="classesContainer" class="classes-container"></section>
+      <p id="maxNotice" class="max-notice" aria-live="polite"></p>
+    </main>
+
+    <template id="classCardTemplate">
+      <article class="class-card collapsed">
+        <button class="class-summary" type="button" aria-expanded="false">
+          <span class="class-title">New Class</span>
+          <span class="chevron">v</span>
+        </button>
+
+        <div class="class-content" hidden>
+          <div class="class-meta">
+            <label>
+              Class Name
+              <input class="class-name-input" type="text" placeholder="e.g. Algebra II" maxlength="40" />
+            </label>
+            <button class="remove-class-btn" type="button">Remove Class</button>
+          </div>
+
+          <div class="grade-grid">
+            <section class="grade-panel">
+              <h3>Assignments</h3>
+              <form class="item-form assignment-form">
+                <input type="text" name="name" placeholder="Assignment name" required maxlength="50" />
+                <input type="date" name="dueDate" required />
+                <button type="submit">Add</button>
+              </form>
+              <ul class="item-list assignments-list"></ul>
+            </section>
+
+            <section class="grade-panel">
+              <h3>Quizzes / Tests</h3>
+              <form class="item-form quiz-form">
+                <input type="text" name="name" placeholder="Quiz/Test name" required maxlength="50" />
+                <input type="date" name="dueDate" required />
+                <button type="submit">Add</button>
+              </form>
+              <ul class="item-list quizzes-list"></ul>
+            </section>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script src="script.js"></script>
+  </body>
+</html>
