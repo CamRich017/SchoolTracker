@@ -120,9 +120,17 @@ function updateCounter() {
   maxNotice.textContent = atMax ? "You reached the maximum of 8 classes." : "";
 }
 
-function createItemRow(item, typeLabel) {
+function createItemRow(item, typeLabel, onRemove) {
   const li = document.createElement("li");
-  li.innerHTML = `<span>${item.name}</span><span class="due-date">${typeLabel}: ${formatDueDate(item.dueDate)}</span>`;
+  li.innerHTML = `
+    <span class="item-name">${item.name}</span>
+    <span class="due-date">${typeLabel}: ${formatDueDate(item.dueDate)}</span>
+    <button type="button" class="item-remove-btn" aria-label="Remove ${item.name}">Remove</button>
+  `;
+  const removeBtn = li.querySelector(".item-remove-btn");
+  if (removeBtn) {
+    removeBtn.addEventListener("click", onRemove);
+  }
   return li;
 }
 
@@ -211,11 +219,25 @@ function renderDashboard() {
     });
 
     classObj.assignments.forEach((item) => {
-      assignmentsList.appendChild(createItemRow(item, "Due"));
+      assignmentsList.appendChild(
+        createItemRow(item, "Due", () => {
+          classObj.assignments = classObj.assignments.filter((entry) => entry.id !== item.id);
+          saveState();
+          renderDashboard();
+          renderCalendar();
+        })
+      );
     });
 
     classObj.quizzes.forEach((item) => {
-      quizzesList.appendChild(createItemRow(item, "Due"));
+      quizzesList.appendChild(
+        createItemRow(item, "Due", () => {
+          classObj.quizzes = classObj.quizzes.filter((entry) => entry.id !== item.id);
+          saveState();
+          renderDashboard();
+          renderCalendar();
+        })
+      );
     });
 
     classesContainer.appendChild(fragment);
