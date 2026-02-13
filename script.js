@@ -152,6 +152,13 @@ function formatDueDate(rawDate) {
   return Number.isNaN(date.getTime()) ? rawDate : date.toLocaleDateString();
 }
 
+function todayIsoDate() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 function addPressAnimation(element) {
   if (!element) return;
   element.addEventListener("click", () => {
@@ -264,6 +271,8 @@ function renderDashboard(focusClassId = null) {
     const quizForm = frag.querySelector(".quiz-form");
     const assignmentsList = frag.querySelector(".assignments-list");
     const quizzesList = frag.querySelector(".quizzes-list");
+    const assignmentDueInput = assignmentForm.querySelector('input[name="dueDate"]');
+    const quizDueInput = quizForm.querySelector('input[name="dueDate"]');
 
     const fallback = `Class ${i + 1}`;
     title.textContent = cls.name || fallback;
@@ -308,7 +317,7 @@ function renderDashboard(focusClassId = null) {
       event.preventDefault();
       const data = new FormData(assignmentForm);
       const name = String(data.get("name") || "").trim();
-      const dueDate = String(data.get("dueDate") || "").trim();
+      const dueDate = String(data.get("dueDate") || "").trim() || todayIsoDate();
       if (!name || !dueDate) return;
 
       cls.assignments.push({ id: makeId(), name, dueDate });
@@ -320,7 +329,7 @@ function renderDashboard(focusClassId = null) {
       event.preventDefault();
       const data = new FormData(quizForm);
       const name = String(data.get("name") || "").trim();
-      const dueDate = String(data.get("dueDate") || "").trim();
+      const dueDate = String(data.get("dueDate") || "").trim() || todayIsoDate();
       if (!name || !dueDate) return;
 
       cls.quizzes.push({ id: makeId(), name, dueDate });
@@ -342,6 +351,13 @@ function renderDashboard(focusClassId = null) {
 
     addPressAnimation(summaryBtn);
     addPressAnimation(removeClassBtn);
+
+    if (assignmentDueInput && !assignmentDueInput.value) {
+      assignmentDueInput.value = todayIsoDate();
+    }
+    if (quizDueInput && !quizDueInput.value) {
+      quizDueInput.value = todayIsoDate();
+    }
 
     classesContainer.appendChild(frag);
     const mountedCard = classesContainer.lastElementChild;
