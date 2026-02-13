@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Assignment Tracker</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header class="topbar">
@@ -29,7 +29,7 @@
       <article class="class-card collapsed">
         <button class="class-summary" type="button" aria-expanded="false">
           <span class="class-title">New Class</span>
-          <span class="chevron">▾</span>
+          <span class="chevron">v</span>
         </button>
 
         <div class="class-content" hidden>
@@ -46,7 +46,7 @@
               <h3>Assignments</h3>
               <form class="item-form assignment-form">
                 <input type="text" name="name" placeholder="Assignment name" required maxlength="50" />
-                <input type="text" name="score" placeholder="Score (e.g. 18/20)" required maxlength="15" />
+                <input type="date" name="dueDate" required />
                 <button type="submit">Add</button>
               </form>
               <ul class="item-list assignments-list"></ul>
@@ -56,7 +56,7 @@
               <h3>Quizzes / Tests</h3>
               <form class="item-form quiz-form">
                 <input type="text" name="name" placeholder="Quiz/Test name" required maxlength="50" />
-                <input type="text" name="score" placeholder="Score (e.g. 45/50)" required maxlength="15" />
+                <input type="date" name="dueDate" required />
                 <button type="submit">Add</button>
               </form>
               <ul class="item-list quizzes-list"></ul>
