@@ -7,49 +7,23 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <h1>SchoolTracker</h1>
-          <p>Classroom-style planner</p>
-        </div>
+    <header class="topbar">
+      <div>
+        <h1>Assignment Tracker</h1>
+        <p>Designed and Developed by Cameron Richmond</p>
+      </div>
+      <button id="addClassBtn" class="add-class-btn" aria-label="Add class">+</button>
+    </header>
 
-        <nav class="sidebar-nav" aria-label="Main navigation">
-          <button id="navDashboard" class="nav-btn active" type="button">Dashboard</button>
-          <button id="navCalendar" class="nav-btn" type="button">Calendar</button>
-        </nav>
-      </aside>
+    <main>
+      <section class="dashboard-header">
+        <h2>My Classes</h2>
+        <span id="classCounter" class="counter">0 / 8 classes</span>
+      </section>
 
-      <main class="main-content">
-        <header class="topbar">
-          <div>
-            <h2 id="pageTitle">My Classes</h2>
-            <p id="pageSubtitle">Track assignments and quizzes by class</p>
-          </div>
-          <button id="addClassBtn" class="add-class-btn" aria-label="Add class">+</button>
-        </header>
-
-        <section id="dashboardView" class="view active" aria-label="Dashboard view">
-          <section class="dashboard-header">
-            <h3>Classes</h3>
-            <span id="classCounter" class="counter">0 / 8 classes</span>
-          </section>
-
-          <section id="classesContainer" class="classes-container"></section>
-          <p id="maxNotice" class="max-notice" aria-live="polite"></p>
-        </section>
-
-        <section id="calendarView" class="view" aria-label="Calendar view" hidden>
-          <section class="calendar-header">
-            <button id="prevMonthBtn" type="button" class="month-btn">Prev</button>
-            <h3 id="calendarMonthLabel">Month Year</h3>
-            <button id="nextMonthBtn" type="button" class="month-btn">Next</button>
-          </section>
-
-          <div class="calendar-grid" id="calendarGrid"></div>
-        </section>
-      </main>
-    </div>
+      <section id="classesContainer" class="classes-container"></section>
+      <p id="maxNotice" class="max-notice" aria-live="polite"></p>
+    </main>
 
     <template id="classCardTemplate">
       <article class="class-card collapsed">
@@ -69,7 +43,7 @@
 
           <div class="grade-grid">
             <section class="grade-panel">
-              <h4>Assignments</h4>
+              <h3>Assignments</h3>
               <form class="item-form assignment-form">
                 <input type="text" name="name" placeholder="Assignment name" required maxlength="50" />
                 <input type="date" name="dueDate" required />
@@ -77,9 +51,9 @@
               </form>
               <ul class="item-list assignments-list"></ul>
             </section>
-
+            
             <section class="grade-panel">
-              <h4>Quizzes / Tests</h4>
+              <h3>Quizzes / Tests</h3>
               <form class="item-form quiz-form">
                 <input type="text" name="name" placeholder="Quiz/Test name" required maxlength="50" />
                 <input type="date" name="dueDate" required />
