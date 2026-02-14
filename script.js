@@ -566,7 +566,7 @@ function setView(viewName) {
     pageSubtitle.textContent = showDashboard
       ? "Track assignments and quizzes by class"
       : showCalendar
-        ? "Google Classroom-style monthly due date view"
+        ? "Track upcoming due dates in a calendar view"
         : "Assignments and quizzes you marked done";
   }
 
