@@ -118,11 +118,18 @@ function defaultGradeCategories() {
 }
 
 function normalizeGradeCategory(category) {
+  const rawCurrent = category && category.current ? String(category.current).trim() : "";
+  let normalizedCurrent = rawCurrent;
+  if (rawCurrent && !rawCurrent.includes("/")) {
+    const asNumber = Number(rawCurrent);
+    normalizedCurrent = Number.isFinite(asNumber) ? `${asNumber}/100` : "";
+  }
+
   return {
     id: category && category.id ? category.id : makeId(),
     name: category && category.name ? category.name : "Category",
     weight: Number.isFinite(Number(category && category.weight)) ? Number(category.weight) : 0,
-    current: category && category.current ? String(category.current) : ""
+    current: normalizedCurrent
   };
 }
 
@@ -131,9 +138,16 @@ function normalizeGradeCalc(gradeCalc) {
     ? gradeCalc.categories.map(normalizeGradeCategory)
     : defaultGradeCategories();
 
+  const rawCurrentInput = gradeCalc && gradeCalc.currentInput ? String(gradeCalc.currentInput).trim() : "";
+  let normalizedCurrentInput = rawCurrentInput;
+  if (rawCurrentInput && !rawCurrentInput.includes("/")) {
+    const asNumber = Number(rawCurrentInput);
+    normalizedCurrentInput = Number.isFinite(asNumber) ? `${asNumber}/100` : "";
+  }
+
   return {
     categories,
-    currentInput: gradeCalc && gradeCalc.currentInput ? String(gradeCalc.currentInput) : "",
+    currentInput: normalizedCurrentInput,
     targetGrade: gradeCalc && gradeCalc.targetGrade ? String(gradeCalc.targetGrade) : "",
     assignmentCategoryId: gradeCalc && gradeCalc.assignmentCategoryId ? String(gradeCalc.assignmentCategoryId) : "",
     assignmentPoints: gradeCalc && gradeCalc.assignmentPoints ? String(gradeCalc.assignmentPoints) : "",
@@ -338,7 +352,8 @@ function currentCourseGrade(classObj) {
 
 function neededScore(current, target, weightPercent) {
   const w = weightPercent / 100;
-  if (!Number.isFinite(current) || !Number.isFinite(target) || !Number.isFinite(w) || w <= 0 || w >= 1) return null;
+  if (!Number.isFinite(current) || !Number.isFinite(target) || !Number.isFinite(w) || w <= 0 || w > 1) return null;
+  if (w === 1) return target;
   return (target - current * (1 - w)) / w;
 }
 
@@ -365,10 +380,17 @@ function neededAssignmentPoints(classObj) {
 
     if (category.id === selectedCategory.id) return;
     const points = parsePoints(category.current);
-    if (!points) return;
+    if (!points) {
+      otherWeighted = Number.NaN;
+      return;
+    }
     const avg = (points.earned / points.total) * 100;
     otherWeighted += avg * weight;
   });
+
+  if (!Number.isFinite(otherWeighted)) {
+    return { error: "Fill points for all weighted categories (e.g. 30/40)." };
+  }
 
   const selectedWeight = Number(selectedCategory.weight);
   if (!Number.isFinite(selectedWeight) || selectedWeight <= 0 || totalWeight <= 0) {
