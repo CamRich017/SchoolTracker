@@ -391,6 +391,37 @@ function neededAssignmentPoints(classObj) {
   };
 }
 
+function updateGradeOutputs(classObj) {
+  const weighted = weightedCategoryAverage(classObj);
+  if (weightedCurrentOutput) {
+    weightedCurrentOutput.textContent =
+      weighted === null ? "Current weighted grade: --" : `Current weighted grade: ${clampPercent(weighted).toFixed(2)}%`;
+  }
+
+  const current = currentCourseGrade(classObj);
+  if (neededAssignmentOutput) {
+    const neededAssignment = neededAssignmentPoints(classObj);
+    if (!neededAssignment || current === null) {
+      neededAssignmentOutput.textContent = "Needed assignment score: --";
+    } else if (neededAssignment.error) {
+      neededAssignmentOutput.textContent = `Needed assignment score: ${neededAssignment.error}`;
+    } else {
+      const neededPct = (neededAssignment.neededEarned / neededAssignment.assignmentPoints) * 100;
+      neededAssignmentOutput.textContent =
+        `Needed assignment score: ${neededAssignment.neededEarned.toFixed(2)} / ${neededAssignment.assignmentPoints.toFixed(2)} ` +
+        `(${neededPct.toFixed(2)}%)`;
+    }
+  }
+
+  const targetExam = Number(classObj.gradeCalc.targetExamGrade);
+  const examWeight = Number(classObj.gradeCalc.examWeight);
+  const neededExam = neededScore(current, targetExam, examWeight);
+  if (neededExamOutput) {
+    neededExamOutput.textContent =
+      neededExam === null ? "Needed exam score: --" : `Needed exam score: ${neededExam.toFixed(2)}%`;
+  }
+}
+
 function renderGradeCalculator() {
   if (!gradeClassSelect || !gradeCategoryRows) return;
   const user = getCurrentUserData();
@@ -458,19 +489,19 @@ function renderGradeCalculator() {
     nameInput.addEventListener("input", () => {
       category.name = nameInput.value.trim() || "Category";
       saveState();
-      renderGradeCalculator();
+      updateGradeOutputs(classObj);
     });
 
     weightInput.addEventListener("input", () => {
       category.weight = Number(weightInput.value || 0);
       saveState();
-      renderGradeCalculator();
+      updateGradeOutputs(classObj);
     });
 
     currentInputEl.addEventListener("input", () => {
       category.current = currentInputEl.value.trim();
       saveState();
-      renderGradeCalculator();
+      updateGradeOutputs(classObj);
     });
 
     removeBtn.addEventListener("click", () => {
@@ -487,34 +518,7 @@ function renderGradeCalculator() {
     gradeCategoryRows.appendChild(row);
   });
 
-  const weighted = weightedCategoryAverage(classObj);
-  if (weightedCurrentOutput) {
-    weightedCurrentOutput.textContent =
-      weighted === null ? "Current weighted grade: --" : `Current weighted grade: ${clampPercent(weighted).toFixed(2)}%`;
-  }
-
-  const current = currentCourseGrade(classObj);
-  if (neededAssignmentOutput) {
-    const neededAssignment = neededAssignmentPoints(classObj);
-    if (!neededAssignment || current === null) {
-      neededAssignmentOutput.textContent = "Needed assignment score: --";
-    } else if (neededAssignment.error) {
-      neededAssignmentOutput.textContent = `Needed assignment score: ${neededAssignment.error}`;
-    } else {
-      const neededPct = (neededAssignment.neededEarned / neededAssignment.assignmentPoints) * 100;
-      neededAssignmentOutput.textContent =
-        `Needed assignment score: ${neededAssignment.neededEarned.toFixed(2)} / ${neededAssignment.assignmentPoints.toFixed(2)} ` +
-        `(${neededPct.toFixed(2)}%)`;
-    }
-  }
-
-  const targetExam = Number(classObj.gradeCalc.targetExamGrade);
-  const examWeight = Number(classObj.gradeCalc.examWeight);
-  const neededExam = neededScore(current, targetExam, examWeight);
-  if (neededExamOutput) {
-    neededExamOutput.textContent =
-      neededExam === null ? "Needed exam score: --" : `Needed exam score: ${neededExam.toFixed(2)}%`;
-  }
+  updateGradeOutputs(classObj);
 }
 
 function updateCounter() {
