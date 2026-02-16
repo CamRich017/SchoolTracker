@@ -275,24 +275,6 @@ function allCompletedItems() {
   return items.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
 }
 
-function parsePercentOrPoints(value) {
-  const text = String(value || "").trim();
-  if (!text) return null;
-
-  if (text.includes("/")) {
-    const parts = text.split("/");
-    if (parts.length !== 2) return null;
-    const earned = Number(parts[0].trim());
-    const total = Number(parts[1].trim());
-    if (!Number.isFinite(earned) || !Number.isFinite(total) || total <= 0) return null;
-    return (earned / total) * 100;
-  }
-
-  const percent = Number(text);
-  if (!Number.isFinite(percent)) return null;
-  return percent;
-}
-
 function parsePoints(value) {
   const text = String(value || "").trim();
   if (!text.includes("/")) return null;
@@ -306,6 +288,16 @@ function parsePoints(value) {
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
+}
+
+function formatNumber(value) {
+  if (!Number.isFinite(value)) return "0";
+  if (Math.abs(value - Math.round(value)) < 0.0001) return String(Math.round(value));
+  return value.toFixed(2);
+}
+
+function formatPoints(earned, total) {
+  return `${formatNumber(earned)}/${formatNumber(total)}`;
 }
 
 function activeGradeClass() {
@@ -324,9 +316,10 @@ function weightedCategoryAverage(classObj) {
   let weightSum = 0;
 
   classObj.gradeCalc.categories.forEach((category) => {
-    const avg = parsePercentOrPoints(category.current);
+    const points = parsePoints(category.current);
     const weight = Number(category.weight);
-    if (!Number.isFinite(avg) || !Number.isFinite(weight) || weight <= 0) return;
+    if (!points || !Number.isFinite(weight) || weight <= 0) return;
+    const avg = (points.earned / points.total) * 100;
     weightedSum += avg * weight;
     weightSum += weight;
   });
@@ -336,10 +329,11 @@ function weightedCategoryAverage(classObj) {
 }
 
 function currentCourseGrade(classObj) {
-  const manual = parsePercentOrPoints(classObj.gradeCalc.currentInput);
-  if (manual !== null) return clampPercent(manual);
   const weighted = weightedCategoryAverage(classObj);
-  return weighted === null ? null : clampPercent(weighted);
+  if (weighted !== null) return clampPercent(weighted);
+  const points = parsePoints(classObj.gradeCalc.currentInput);
+  if (!points) return null;
+  return clampPercent((points.earned / points.total) * 100);
 }
 
 function neededScore(current, target, weightPercent) {
@@ -370,8 +364,9 @@ function neededAssignmentPoints(classObj) {
     totalWeight += weight;
 
     if (category.id === selectedCategory.id) return;
-    const avg = parsePercentOrPoints(category.current);
-    if (avg === null) return;
+    const points = parsePoints(category.current);
+    if (!points) return;
+    const avg = (points.earned / points.total) * 100;
     otherWeighted += avg * weight;
   });
 
@@ -391,7 +386,32 @@ function neededAssignmentPoints(classObj) {
   };
 }
 
+function syncCurrentInputFromWeighted(classObj) {
+  const weighted = weightedCategoryAverage(classObj);
+  if (weighted === null) return;
+  classObj.gradeCalc.currentInput = formatPoints(clampPercent(weighted), 100);
+}
+
+function applyCurrentPointsToCategories(classObj, textValue) {
+  const currentPoints = parsePoints(textValue);
+  if (!currentPoints) return false;
+  const ratio = currentPoints.earned / currentPoints.total;
+
+  classObj.gradeCalc.categories.forEach((category) => {
+    const existing = parsePoints(category.current);
+    const total = existing ? existing.total : 100;
+    const earned = ratio * total;
+    category.current = formatPoints(earned, total);
+  });
+  return true;
+}
+
 function updateGradeOutputs(classObj) {
+  syncCurrentInputFromWeighted(classObj);
+  if (currentGradeInput && document.activeElement !== currentGradeInput) {
+    currentGradeInput.value = classObj.gradeCalc.currentInput;
+  }
+
   const weighted = weightedCategoryAverage(classObj);
   if (weightedCurrentOutput) {
     weightedCurrentOutput.textContent =
@@ -477,7 +497,7 @@ function renderGradeCalculator() {
     row.innerHTML = `
       <input type="text" class="grade-cat-name" value="${category.name}" maxlength="30" />
       <input type="number" class="grade-cat-weight" value="${category.weight}" min="0" max="100" step="0.01" placeholder="Weight %" />
-      <input type="text" class="grade-cat-current" value="${category.current}" placeholder="% or pts (30/40)" />
+      <input type="text" class="grade-cat-current" value="${category.current}" placeholder="Points (e.g. 30/40)" />
       <button type="button" class="item-remove-btn">Remove</button>
     `;
 
@@ -927,6 +947,7 @@ if (currentGradeInput) {
     const classObj = activeGradeClass();
     if (!classObj) return;
     classObj.gradeCalc.currentInput = currentGradeInput.value.trim();
+    applyCurrentPointsToCategories(classObj, classObj.gradeCalc.currentInput);
     saveState();
     renderGradeCalculator();
   });
