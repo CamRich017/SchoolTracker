@@ -443,7 +443,9 @@ function updateGradeOutputs(classObj) {
   const current = currentCourseGrade(classObj);
   if (neededAssignmentOutput) {
     const neededAssignment = neededAssignmentPoints(classObj);
-    if (!neededAssignment || current === null) {
+    if (current === null) {
+      neededAssignmentOutput.textContent = "Needed assignment score: Enter current points (e.g. 350/400).";
+    } else if (!neededAssignment) {
       neededAssignmentOutput.textContent = "Needed assignment score: --";
     } else if (neededAssignment.error) {
       neededAssignmentOutput.textContent = `Needed assignment score: ${neededAssignment.error}`;
@@ -460,7 +462,11 @@ function updateGradeOutputs(classObj) {
   const neededExam = neededScore(current, targetExam, examWeight);
   if (neededExamOutput) {
     neededExamOutput.textContent =
-      neededExam === null ? "Needed exam score: --" : `Needed exam score: ${neededExam.toFixed(2)}%`;
+      current === null
+        ? "Needed exam score: Enter current points (e.g. 350/400)."
+        : neededExam === null
+          ? "Needed exam score: --"
+          : `Needed exam score: ${neededExam.toFixed(2)}%`;
   }
 }
 
@@ -969,9 +975,13 @@ if (currentGradeInput) {
     const classObj = activeGradeClass();
     if (!classObj) return;
     classObj.gradeCalc.currentInput = currentGradeInput.value.trim();
-    applyCurrentPointsToCategories(classObj, classObj.gradeCalc.currentInput);
+    const changedCategories = applyCurrentPointsToCategories(classObj, classObj.gradeCalc.currentInput);
     saveState();
-    renderGradeCalculator();
+    if (changedCategories) {
+      renderGradeCalculator();
+    } else {
+      updateGradeOutputs(classObj);
+    }
   });
 }
 
@@ -981,7 +991,7 @@ if (targetGradeInput) {
     if (!classObj) return;
     classObj.gradeCalc.targetGrade = targetGradeInput.value;
     saveState();
-    renderGradeCalculator();
+    updateGradeOutputs(classObj);
   });
 }
 
@@ -991,7 +1001,7 @@ if (assignmentCategorySelect) {
     if (!classObj) return;
     classObj.gradeCalc.assignmentCategoryId = assignmentCategorySelect.value || "";
     saveState();
-    renderGradeCalculator();
+    updateGradeOutputs(classObj);
   });
 }
 
@@ -1001,7 +1011,7 @@ if (assignmentPointsInput) {
     if (!classObj) return;
     classObj.gradeCalc.assignmentPoints = assignmentPointsInput.value;
     saveState();
-    renderGradeCalculator();
+    updateGradeOutputs(classObj);
   });
 }
 
@@ -1011,7 +1021,7 @@ if (targetExamGradeInput) {
     if (!classObj) return;
     classObj.gradeCalc.targetExamGrade = targetExamGradeInput.value;
     saveState();
-    renderGradeCalculator();
+    updateGradeOutputs(classObj);
   });
 }
 
@@ -1021,7 +1031,7 @@ if (examWeightInput) {
     if (!classObj) return;
     classObj.gradeCalc.examWeight = examWeightInput.value;
     saveState();
-    renderGradeCalculator();
+    updateGradeOutputs(classObj);
   });
 }
 
