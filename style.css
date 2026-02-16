@@ -495,6 +495,103 @@ body {
   font-size: 0.84rem;
 }
 
+.grade-calc-panel {
+  margin-bottom: 1rem;
+}
+
+.grade-calc-top {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.grade-calc-label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.grade-calc-label input,
+.grade-calc-label select {
+  padding: 0.58rem;
+  border: 1px solid rgba(137, 159, 196, 0.35);
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.95);
+  color: var(--text);
+  outline: none;
+}
+
+.grade-help {
+  margin: 0 0 0.55rem;
+  color: #c1d3f3;
+  font-size: 0.83rem;
+  background: rgba(53, 184, 255, 0.1);
+  border: 1px solid rgba(53, 184, 255, 0.35);
+  border-radius: 999px;
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+}
+
+.grade-category-rows {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 0.7rem;
+}
+
+.grade-category-row {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  border: 1px solid rgba(137, 159, 196, 0.32);
+  border-radius: 12px;
+  background: rgba(10, 15, 24, 0.85);
+  padding: 0.45rem;
+}
+
+.grade-category-row input {
+  padding: 0.46rem 0.52rem;
+  border: 1px solid rgba(137, 159, 196, 0.35);
+  border-radius: 8px;
+  background: rgba(12, 19, 31, 0.95);
+  color: #f2f7ff;
+  font-size: 0.84rem;
+  font-weight: 600;
+  outline: none;
+}
+
+.grade-category-row .grade-cat-name {
+  letter-spacing: 0.01em;
+}
+
+.grade-category-row .grade-cat-weight,
+.grade-category-row .grade-cat-current {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.grade-category-row .item-remove-btn {
+  padding: 0.36rem 0.6rem;
+  font-size: 0.73rem;
+  border-radius: 999px;
+}
+
+.grade-output {
+  margin: 0.72rem 0 0;
+  font-weight: 750;
+  color: var(--accent-2);
+  background: rgba(116, 255, 211, 0.08);
+  border: 1px solid rgba(116, 255, 211, 0.3);
+  border-radius: 10px;
+  padding: 0.42rem 0.55rem;
+}
+
+.grade-calc-tools {
+  margin-top: 0;
+}
+
 @media (max-width: 960px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -521,5 +618,13 @@ body {
 
   .day-header {
     display: none;
+  }
+
+  .grade-calc-top {
+    grid-template-columns: 1fr;
+  }
+
+  .grade-category-row {
+    grid-template-columns: 1fr;
   }
 }

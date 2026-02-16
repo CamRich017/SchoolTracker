@@ -19,6 +19,7 @@
           <button id="navDashboard" class="nav-btn active" type="button">Dashboard</button>
           <button id="navCalendar" class="nav-btn" type="button">Calendar</button>
           <button id="navCompleted" class="nav-btn" type="button">Completed</button>
+          <button id="navGrades" class="nav-btn" type="button">Grade Calculator</button>
         </nav>
       </aside>
 
@@ -57,6 +58,64 @@
             <span id="completedCounter" class="counter">0 completed</span>
           </section>
           <ul id="completedList" class="completed-list"></ul>
+        </section>
+
+        <section id="gradesView" class="view" aria-label="Grade calculator view" hidden>
+          <section class="dashboard-header">
+            <h3>Grade Calculator</h3>
+            <span class="counter">Weighted + Goal Tools</span>
+          </section>
+
+          <section class="grade-panel grade-calc-panel">
+            <div class="grade-calc-top">
+              <label class="grade-calc-label">
+                Class
+                <select id="gradeClassSelect"></select>
+              </label>
+              <label class="grade-calc-label">
+                Current Grade (% or points, e.g. 30/40)
+                <input id="currentGradeInput" type="text" placeholder="e.g. 87.5 or 30/40" />
+              </label>
+            </div>
+
+            <h4>Weighted Categories</h4>
+            <p class="grade-help">Add categories like assignments, tests, quizzes and set your class weighting.</p>
+            <div id="gradeCategoryRows" class="grade-category-rows"></div>
+            <button id="addCategoryBtn" type="button" class="month-btn">Add Category</button>
+            <p id="weightedCurrentOutput" class="grade-output">Current weighted grade: --</p>
+          </section>
+
+          <section class="grade-grid grade-calc-tools">
+            <section class="grade-panel">
+              <h4>Needed On Next Assignment</h4>
+              <label class="grade-calc-label">
+                Target Course Grade (%)
+                <input id="targetGradeInput" type="number" min="0" max="100" step="0.01" placeholder="e.g. 90" />
+              </label>
+              <label class="grade-calc-label">
+                Category
+                <select id="assignmentCategorySelect"></select>
+              </label>
+              <label class="grade-calc-label">
+                Assignment Points
+                <input id="assignmentPointsInput" type="number" min="0.01" step="0.01" placeholder="e.g. 20" />
+              </label>
+              <p id="neededAssignmentOutput" class="grade-output">Needed assignment score: --</p>
+            </section>
+
+            <section class="grade-panel">
+              <h4>Exam Calculator</h4>
+              <label class="grade-calc-label">
+                Target Final Grade (%)
+                <input id="targetExamGradeInput" type="number" min="0" max="100" step="0.01" placeholder="e.g. 92" />
+              </label>
+              <label class="grade-calc-label">
+                Exam Weight Of Final Grade (%)
+                <input id="examWeightInput" type="number" min="0.01" max="100" step="0.01" placeholder="e.g. 20" />
+              </label>
+              <p id="neededExamOutput" class="grade-output">Needed exam score: --</p>
+            </section>
+          </section>
         </section>
       </main>
     </div>

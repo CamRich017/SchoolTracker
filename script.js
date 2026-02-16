@@ -11,10 +11,12 @@ const classCardTemplate = document.getElementById("classCardTemplate");
 const navDashboard = document.getElementById("navDashboard");
 const navCalendar = document.getElementById("navCalendar");
 const navCompleted = document.getElementById("navCompleted");
+const navGrades = document.getElementById("navGrades");
 
 const dashboardView = document.getElementById("dashboardView");
 const calendarView = document.getElementById("calendarView");
 const completedView = document.getElementById("completedView");
+const gradesView = document.getElementById("gradesView");
 
 const pageTitle = document.getElementById("pageTitle");
 const pageSubtitle = document.getElementById("pageSubtitle");
@@ -25,6 +27,18 @@ const nextMonthBtn = document.getElementById("nextMonthBtn");
 
 const completedList = document.getElementById("completedList");
 const completedCounter = document.getElementById("completedCounter");
+const gradeClassSelect = document.getElementById("gradeClassSelect");
+const currentGradeInput = document.getElementById("currentGradeInput");
+const gradeCategoryRows = document.getElementById("gradeCategoryRows");
+const addCategoryBtn = document.getElementById("addCategoryBtn");
+const weightedCurrentOutput = document.getElementById("weightedCurrentOutput");
+const targetGradeInput = document.getElementById("targetGradeInput");
+const assignmentCategorySelect = document.getElementById("assignmentCategorySelect");
+const assignmentPointsInput = document.getElementById("assignmentPointsInput");
+const neededAssignmentOutput = document.getElementById("neededAssignmentOutput");
+const targetExamGradeInput = document.getElementById("targetExamGradeInput");
+const examWeightInput = document.getElementById("examWeightInput");
+const neededExamOutput = document.getElementById("neededExamOutput");
 
 const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const memoryStore = {};
@@ -71,7 +85,8 @@ function buildDefaultState() {
     users: {},
     currentView: "dashboard",
     calendarYear: now.getFullYear(),
-    calendarMonth: now.getMonth()
+    calendarMonth: now.getMonth(),
+    gradeSelectedClassId: null
   };
 }
 
@@ -94,6 +109,39 @@ function normalizeCompleted(item) {
   };
 }
 
+function defaultGradeCategories() {
+  return [
+    { id: makeId(), name: "Assignments", weight: 40, current: "" },
+    { id: makeId(), name: "Tests", weight: 40, current: "" },
+    { id: makeId(), name: "Quizzes", weight: 20, current: "" }
+  ];
+}
+
+function normalizeGradeCategory(category) {
+  return {
+    id: category && category.id ? category.id : makeId(),
+    name: category && category.name ? category.name : "Category",
+    weight: Number.isFinite(Number(category && category.weight)) ? Number(category.weight) : 0,
+    current: category && category.current ? String(category.current) : ""
+  };
+}
+
+function normalizeGradeCalc(gradeCalc) {
+  const categories = Array.isArray(gradeCalc && gradeCalc.categories)
+    ? gradeCalc.categories.map(normalizeGradeCategory)
+    : defaultGradeCategories();
+
+  return {
+    categories,
+    currentInput: gradeCalc && gradeCalc.currentInput ? String(gradeCalc.currentInput) : "",
+    targetGrade: gradeCalc && gradeCalc.targetGrade ? String(gradeCalc.targetGrade) : "",
+    assignmentCategoryId: gradeCalc && gradeCalc.assignmentCategoryId ? String(gradeCalc.assignmentCategoryId) : "",
+    assignmentPoints: gradeCalc && gradeCalc.assignmentPoints ? String(gradeCalc.assignmentPoints) : "",
+    targetExamGrade: gradeCalc && gradeCalc.targetExamGrade ? String(gradeCalc.targetExamGrade) : "",
+    examWeight: gradeCalc && gradeCalc.examWeight ? String(gradeCalc.examWeight) : ""
+  };
+}
+
 function loadState() {
   try {
     const raw = storageGet(STORAGE_KEY);
@@ -104,7 +152,7 @@ function loadState() {
     if (!merged.users || typeof merged.users !== "object" || Array.isArray(merged.users)) {
       merged.users = {};
     }
-    if (!["dashboard", "calendar", "completed"].includes(merged.currentView)) {
+    if (!["dashboard", "calendar", "completed", "grades"].includes(merged.currentView)) {
       merged.currentView = "dashboard";
     }
     return merged;
@@ -150,6 +198,7 @@ function getCurrentUserData() {
     classObj.assignments = Array.isArray(classObj.assignments) ? classObj.assignments.map(normalizeItem) : [];
     classObj.quizzes = Array.isArray(classObj.quizzes) ? classObj.quizzes.map(normalizeItem) : [];
     classObj.completed = Array.isArray(classObj.completed) ? classObj.completed.map(normalizeCompleted) : [];
+    classObj.gradeCalc = normalizeGradeCalc(classObj.gradeCalc);
   }
 
   return user;
@@ -224,6 +273,248 @@ function allCompletedItems() {
     });
   });
   return items.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
+}
+
+function parsePercentOrPoints(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  if (text.includes("/")) {
+    const parts = text.split("/");
+    if (parts.length !== 2) return null;
+    const earned = Number(parts[0].trim());
+    const total = Number(parts[1].trim());
+    if (!Number.isFinite(earned) || !Number.isFinite(total) || total <= 0) return null;
+    return (earned / total) * 100;
+  }
+
+  const percent = Number(text);
+  if (!Number.isFinite(percent)) return null;
+  return percent;
+}
+
+function parsePoints(value) {
+  const text = String(value || "").trim();
+  if (!text.includes("/")) return null;
+  const parts = text.split("/");
+  if (parts.length !== 2) return null;
+  const earned = Number(parts[0].trim());
+  const total = Number(parts[1].trim());
+  if (!Number.isFinite(earned) || !Number.isFinite(total) || total <= 0) return null;
+  return { earned, total };
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function activeGradeClass() {
+  const user = getCurrentUserData();
+  if (!user.classes.length) return null;
+
+  if (!state.gradeSelectedClassId || !user.classes.some((cls) => cls.id === state.gradeSelectedClassId)) {
+    state.gradeSelectedClassId = user.classes[0].id;
+  }
+
+  return user.classes.find((cls) => cls.id === state.gradeSelectedClassId) || null;
+}
+
+function weightedCategoryAverage(classObj) {
+  let weightedSum = 0;
+  let weightSum = 0;
+
+  classObj.gradeCalc.categories.forEach((category) => {
+    const avg = parsePercentOrPoints(category.current);
+    const weight = Number(category.weight);
+    if (!Number.isFinite(avg) || !Number.isFinite(weight) || weight <= 0) return;
+    weightedSum += avg * weight;
+    weightSum += weight;
+  });
+
+  if (weightSum <= 0) return null;
+  return weightedSum / weightSum;
+}
+
+function currentCourseGrade(classObj) {
+  const manual = parsePercentOrPoints(classObj.gradeCalc.currentInput);
+  if (manual !== null) return clampPercent(manual);
+  const weighted = weightedCategoryAverage(classObj);
+  return weighted === null ? null : clampPercent(weighted);
+}
+
+function neededScore(current, target, weightPercent) {
+  const w = weightPercent / 100;
+  if (!Number.isFinite(current) || !Number.isFinite(target) || !Number.isFinite(w) || w <= 0 || w >= 1) return null;
+  return (target - current * (1 - w)) / w;
+}
+
+function neededAssignmentPoints(classObj) {
+  const target = Number(classObj.gradeCalc.targetGrade);
+  const assignmentPoints = Number(classObj.gradeCalc.assignmentPoints);
+  if (!Number.isFinite(target) || !Number.isFinite(assignmentPoints) || assignmentPoints <= 0) return null;
+
+  const categories = classObj.gradeCalc.categories;
+  const selectedCategory = categories.find((c) => c.id === classObj.gradeCalc.assignmentCategoryId) || categories[0];
+  if (!selectedCategory) return null;
+
+  const selectedPoints = parsePoints(selectedCategory.current);
+  if (!selectedPoints) {
+    return { error: "Set selected category current as points (e.g. 30/40)." };
+  }
+
+  let totalWeight = 0;
+  let otherWeighted = 0;
+  categories.forEach((category) => {
+    const weight = Number(category.weight);
+    if (!Number.isFinite(weight) || weight <= 0) return;
+    totalWeight += weight;
+
+    if (category.id === selectedCategory.id) return;
+    const avg = parsePercentOrPoints(category.current);
+    if (avg === null) return;
+    otherWeighted += avg * weight;
+  });
+
+  const selectedWeight = Number(selectedCategory.weight);
+  if (!Number.isFinite(selectedWeight) || selectedWeight <= 0 || totalWeight <= 0) {
+    return { error: "Selected category needs a weight greater than 0." };
+  }
+
+  const requiredCategoryPercent = (target * totalWeight - otherWeighted) / selectedWeight;
+  const neededEarned =
+    (requiredCategoryPercent / 100) * (selectedPoints.total + assignmentPoints) - selectedPoints.earned;
+
+  return {
+    neededEarned,
+    assignmentPoints,
+    requiredCategoryPercent
+  };
+}
+
+function renderGradeCalculator() {
+  if (!gradeClassSelect || !gradeCategoryRows) return;
+  const user = getCurrentUserData();
+
+  gradeClassSelect.innerHTML = "";
+  user.classes.forEach((classObj) => {
+    const option = document.createElement("option");
+    option.value = classObj.id;
+    option.textContent = classObj.name;
+    gradeClassSelect.appendChild(option);
+  });
+
+  const classObj = activeGradeClass();
+  if (!classObj) {
+    gradeCategoryRows.innerHTML = "";
+    if (weightedCurrentOutput) weightedCurrentOutput.textContent = "Current weighted grade: --";
+    if (neededAssignmentOutput) neededAssignmentOutput.textContent = "Needed assignment score: --";
+    if (neededExamOutput) neededExamOutput.textContent = "Needed exam score: --";
+    return;
+  }
+
+  gradeClassSelect.value = classObj.id;
+  if (currentGradeInput) currentGradeInput.value = classObj.gradeCalc.currentInput;
+  if (targetGradeInput) targetGradeInput.value = classObj.gradeCalc.targetGrade;
+  if (assignmentPointsInput) assignmentPointsInput.value = classObj.gradeCalc.assignmentPoints;
+  if (targetExamGradeInput) targetExamGradeInput.value = classObj.gradeCalc.targetExamGrade;
+  if (examWeightInput) examWeightInput.value = classObj.gradeCalc.examWeight;
+
+  if (assignmentCategorySelect) {
+    assignmentCategorySelect.innerHTML = "";
+    classObj.gradeCalc.categories.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category.id;
+      option.textContent = category.name;
+      assignmentCategorySelect.appendChild(option);
+    });
+    if (
+      !classObj.gradeCalc.assignmentCategoryId ||
+      !classObj.gradeCalc.categories.some((category) => category.id === classObj.gradeCalc.assignmentCategoryId)
+    ) {
+      classObj.gradeCalc.assignmentCategoryId = classObj.gradeCalc.categories[0]
+        ? classObj.gradeCalc.categories[0].id
+        : "";
+      saveState();
+    }
+    assignmentCategorySelect.value = classObj.gradeCalc.assignmentCategoryId;
+  }
+
+  gradeCategoryRows.innerHTML = "";
+  classObj.gradeCalc.categories.forEach((category) => {
+    const row = document.createElement("div");
+    row.className = "grade-category-row";
+    row.innerHTML = `
+      <input type="text" class="grade-cat-name" value="${category.name}" maxlength="30" />
+      <input type="number" class="grade-cat-weight" value="${category.weight}" min="0" max="100" step="0.01" placeholder="Weight %" />
+      <input type="text" class="grade-cat-current" value="${category.current}" placeholder="% or pts (30/40)" />
+      <button type="button" class="item-remove-btn">Remove</button>
+    `;
+
+    const nameInput = row.querySelector(".grade-cat-name");
+    const weightInput = row.querySelector(".grade-cat-weight");
+    const currentInputEl = row.querySelector(".grade-cat-current");
+    const removeBtn = row.querySelector(".item-remove-btn");
+
+    nameInput.addEventListener("input", () => {
+      category.name = nameInput.value.trim() || "Category";
+      saveState();
+      renderGradeCalculator();
+    });
+
+    weightInput.addEventListener("input", () => {
+      category.weight = Number(weightInput.value || 0);
+      saveState();
+      renderGradeCalculator();
+    });
+
+    currentInputEl.addEventListener("input", () => {
+      category.current = currentInputEl.value.trim();
+      saveState();
+      renderGradeCalculator();
+    });
+
+    removeBtn.addEventListener("click", () => {
+      classObj.gradeCalc.categories = classObj.gradeCalc.categories.filter((entry) => entry.id !== category.id);
+      if (classObj.gradeCalc.assignmentCategoryId === category.id) {
+        classObj.gradeCalc.assignmentCategoryId = classObj.gradeCalc.categories[0]
+          ? classObj.gradeCalc.categories[0].id
+          : "";
+      }
+      saveState();
+      renderGradeCalculator();
+    });
+
+    gradeCategoryRows.appendChild(row);
+  });
+
+  const weighted = weightedCategoryAverage(classObj);
+  if (weightedCurrentOutput) {
+    weightedCurrentOutput.textContent =
+      weighted === null ? "Current weighted grade: --" : `Current weighted grade: ${clampPercent(weighted).toFixed(2)}%`;
+  }
+
+  const current = currentCourseGrade(classObj);
+  if (neededAssignmentOutput) {
+    const neededAssignment = neededAssignmentPoints(classObj);
+    if (!neededAssignment || current === null) {
+      neededAssignmentOutput.textContent = "Needed assignment score: --";
+    } else if (neededAssignment.error) {
+      neededAssignmentOutput.textContent = `Needed assignment score: ${neededAssignment.error}`;
+    } else {
+      const neededPct = (neededAssignment.neededEarned / neededAssignment.assignmentPoints) * 100;
+      neededAssignmentOutput.textContent =
+        `Needed assignment score: ${neededAssignment.neededEarned.toFixed(2)} / ${neededAssignment.assignmentPoints.toFixed(2)} ` +
+        `(${neededPct.toFixed(2)}%)`;
+    }
+  }
+
+  const targetExam = Number(classObj.gradeCalc.targetExamGrade);
+  const examWeight = Number(classObj.gradeCalc.examWeight);
+  const neededExam = neededScore(current, targetExam, examWeight);
+  if (neededExamOutput) {
+    neededExamOutput.textContent =
+      neededExam === null ? "Needed exam score: --" : `Needed exam score: ${neededExam.toFixed(2)}%`;
+  }
 }
 
 function updateCounter() {
@@ -341,15 +632,20 @@ function renderDashboard(focusClassId = null) {
       saveState();
       renderCalendar();
       renderCompleted();
+      renderGradeCalculator();
     });
 
     removeClassBtn.addEventListener("click", () => {
       const user = getCurrentUserData();
       user.classes = user.classes.filter((entry) => entry.id !== classObj.id);
+      if (state.gradeSelectedClassId === classObj.id) {
+        state.gradeSelectedClassId = null;
+      }
       saveState();
       renderDashboard();
       renderCalendar();
       renderCompleted();
+      renderGradeCalculator();
     });
 
     assignmentForm.addEventListener("submit", (event) => {
@@ -363,6 +659,7 @@ function renderDashboard(focusClassId = null) {
       saveState();
       renderDashboard(classObj.id);
       renderCalendar();
+      renderGradeCalculator();
     });
 
     quizForm.addEventListener("submit", (event) => {
@@ -376,6 +673,7 @@ function renderDashboard(focusClassId = null) {
       saveState();
       renderDashboard(classObj.id);
       renderCalendar();
+      renderGradeCalculator();
     });
 
     classObj.assignments
@@ -539,27 +837,33 @@ function setView(viewName) {
   const showDashboard = viewName === "dashboard";
   const showCalendar = viewName === "calendar";
   const showCompleted = viewName === "completed";
+  const showGrades = viewName === "grades";
 
-  state.currentView = showDashboard || showCalendar || showCompleted ? viewName : "dashboard";
+  state.currentView = showDashboard || showCalendar || showCompleted || showGrades ? viewName : "dashboard";
 
   if (dashboardView) dashboardView.hidden = !showDashboard;
   if (calendarView) calendarView.hidden = !showCalendar;
   if (completedView) completedView.hidden = !showCompleted;
+  if (gradesView) gradesView.hidden = !showGrades;
 
   if (dashboardView) dashboardView.classList.toggle("active", showDashboard);
   if (calendarView) calendarView.classList.toggle("active", showCalendar);
   if (completedView) completedView.classList.toggle("active", showCompleted);
+  if (gradesView) gradesView.classList.toggle("active", showGrades);
 
   if (navDashboard) navDashboard.classList.toggle("active", showDashboard);
   if (navCalendar) navCalendar.classList.toggle("active", showCalendar);
   if (navCompleted) navCompleted.classList.toggle("active", showCompleted);
+  if (navGrades) navGrades.classList.toggle("active", showGrades);
 
   if (pageTitle) {
     pageTitle.textContent = showDashboard
       ? "My Classes"
       : showCalendar
         ? "Due Date Calendar"
-        : "Completed Assignments";
+        : showCompleted
+          ? "Completed Assignments"
+          : "Grade Calculator";
   }
 
   if (pageSubtitle) {
@@ -567,7 +871,9 @@ function setView(viewName) {
       ? "Track assignments and quizzes by class"
       : showCalendar
         ? "Track upcoming due dates in a calendar view"
-        : "Assignments and quizzes you marked done";
+        : showCompleted
+          ? "Assignments and quizzes you marked done"
+          : "Weight categories and calculate needed scores";
   }
 
   if (addClassBtn) addClassBtn.style.display = showDashboard ? "inline-block" : "none";
@@ -578,6 +884,7 @@ function setView(viewName) {
 if (navDashboard) navDashboard.addEventListener("click", () => setView("dashboard"));
 if (navCalendar) navCalendar.addEventListener("click", () => setView("calendar"));
 if (navCompleted) navCompleted.addEventListener("click", () => setView("completed"));
+if (navGrades) navGrades.addEventListener("click", () => setView("grades"));
 
 if (prevMonthBtn) {
   prevMonthBtn.addEventListener("click", () => {
@@ -603,6 +910,89 @@ if (nextMonthBtn) {
   });
 }
 
+if (gradeClassSelect) {
+  gradeClassSelect.addEventListener("change", () => {
+    state.gradeSelectedClassId = gradeClassSelect.value || null;
+    saveState();
+    renderGradeCalculator();
+  });
+}
+
+if (currentGradeInput) {
+  currentGradeInput.addEventListener("input", () => {
+    const classObj = activeGradeClass();
+    if (!classObj) return;
+    classObj.gradeCalc.currentInput = currentGradeInput.value.trim();
+    saveState();
+    renderGradeCalculator();
+  });
+}
+
+if (targetGradeInput) {
+  targetGradeInput.addEventListener("input", () => {
+    const classObj = activeGradeClass();
+    if (!classObj) return;
+    classObj.gradeCalc.targetGrade = targetGradeInput.value;
+    saveState();
+    renderGradeCalculator();
+  });
+}
+
+if (assignmentCategorySelect) {
+  assignmentCategorySelect.addEventListener("change", () => {
+    const classObj = activeGradeClass();
+    if (!classObj) return;
+    classObj.gradeCalc.assignmentCategoryId = assignmentCategorySelect.value || "";
+    saveState();
+    renderGradeCalculator();
+  });
+}
+
+if (assignmentPointsInput) {
+  assignmentPointsInput.addEventListener("input", () => {
+    const classObj = activeGradeClass();
+    if (!classObj) return;
+    classObj.gradeCalc.assignmentPoints = assignmentPointsInput.value;
+    saveState();
+    renderGradeCalculator();
+  });
+}
+
+if (targetExamGradeInput) {
+  targetExamGradeInput.addEventListener("input", () => {
+    const classObj = activeGradeClass();
+    if (!classObj) return;
+    classObj.gradeCalc.targetExamGrade = targetExamGradeInput.value;
+    saveState();
+    renderGradeCalculator();
+  });
+}
+
+if (examWeightInput) {
+  examWeightInput.addEventListener("input", () => {
+    const classObj = activeGradeClass();
+    if (!classObj) return;
+    classObj.gradeCalc.examWeight = examWeightInput.value;
+    saveState();
+    renderGradeCalculator();
+  });
+}
+
+if (addCategoryBtn) {
+  addCategoryBtn.addEventListener("click", () => {
+    const classObj = activeGradeClass();
+    if (!classObj) return;
+    classObj.gradeCalc.categories.push({
+      id: makeId(),
+      name: "New Category",
+      weight: 0,
+      current: ""
+    });
+    saveState();
+    renderGradeCalculator();
+  });
+}
+
 if (addClassBtn) {
   addClassBtn.addEventListener("click", () => {
     const user = getCurrentUserData();
@@ -618,7 +1008,8 @@ if (addClassBtn) {
       collapsed: false,
       assignments: [],
       quizzes: [],
-      completed: []
+      completed: [],
+      gradeCalc: normalizeGradeCalc(null)
     });
 
     saveState();
@@ -626,6 +1017,7 @@ if (addClassBtn) {
     renderDashboard(classId);
     renderCalendar();
     renderCompleted();
+    renderGradeCalculator();
   });
 }
 
@@ -633,11 +1025,14 @@ addPressAnimation(addClassBtn);
 addPressAnimation(navDashboard);
 addPressAnimation(navCalendar);
 addPressAnimation(navCompleted);
+addPressAnimation(navGrades);
 addPressAnimation(prevMonthBtn);
 addPressAnimation(nextMonthBtn);
+addPressAnimation(addCategoryBtn);
 
 getCurrentUserData();
 setView(state.currentView || "dashboard");
 renderDashboard();
 renderCalendar();
 renderCompleted();
+renderGradeCalculator();
