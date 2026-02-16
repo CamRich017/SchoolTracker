@@ -28,7 +28,6 @@ const nextMonthBtn = document.getElementById("nextMonthBtn");
 const completedList = document.getElementById("completedList");
 const completedCounter = document.getElementById("completedCounter");
 const gradeClassSelect = document.getElementById("gradeClassSelect");
-const currentGradeInput = document.getElementById("currentGradeInput");
 const gradeCategoryRows = document.getElementById("gradeCategoryRows");
 const addCategoryBtn = document.getElementById("addCategoryBtn");
 const weightedCurrentOutput = document.getElementById("weightedCurrentOutput");
@@ -138,16 +137,8 @@ function normalizeGradeCalc(gradeCalc) {
     ? gradeCalc.categories.map(normalizeGradeCategory)
     : defaultGradeCategories();
 
-  const rawCurrentInput = gradeCalc && gradeCalc.currentInput ? String(gradeCalc.currentInput).trim() : "";
-  let normalizedCurrentInput = rawCurrentInput;
-  if (rawCurrentInput && !rawCurrentInput.includes("/")) {
-    const asNumber = Number(rawCurrentInput);
-    normalizedCurrentInput = Number.isFinite(asNumber) ? `${asNumber}/100` : "";
-  }
-
   return {
     categories,
-    currentInput: normalizedCurrentInput,
     targetGrade: gradeCalc && gradeCalc.targetGrade ? String(gradeCalc.targetGrade) : "",
     assignmentCategoryId: gradeCalc && gradeCalc.assignmentCategoryId ? String(gradeCalc.assignmentCategoryId) : "",
     assignmentPoints: gradeCalc && gradeCalc.assignmentPoints ? String(gradeCalc.assignmentPoints) : "",
@@ -304,16 +295,6 @@ function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
 }
 
-function formatNumber(value) {
-  if (!Number.isFinite(value)) return "0";
-  if (Math.abs(value - Math.round(value)) < 0.0001) return String(Math.round(value));
-  return value.toFixed(2);
-}
-
-function formatPoints(earned, total) {
-  return `${formatNumber(earned)}/${formatNumber(total)}`;
-}
-
 function activeGradeClass() {
   const user = getCurrentUserData();
   if (!user.classes.length) return null;
@@ -344,10 +325,7 @@ function weightedCategoryAverage(classObj) {
 
 function currentCourseGrade(classObj) {
   const weighted = weightedCategoryAverage(classObj);
-  if (weighted !== null) return clampPercent(weighted);
-  const points = parsePoints(classObj.gradeCalc.currentInput);
-  if (!points) return null;
-  return clampPercent((points.earned / points.total) * 100);
+  return weighted === null ? null : clampPercent(weighted);
 }
 
 function neededScore(current, target, weightPercent) {
@@ -408,32 +386,7 @@ function neededAssignmentPoints(classObj) {
   };
 }
 
-function syncCurrentInputFromWeighted(classObj) {
-  const weighted = weightedCategoryAverage(classObj);
-  if (weighted === null) return;
-  classObj.gradeCalc.currentInput = formatPoints(clampPercent(weighted), 100);
-}
-
-function applyCurrentPointsToCategories(classObj, textValue) {
-  const currentPoints = parsePoints(textValue);
-  if (!currentPoints) return false;
-  const ratio = currentPoints.earned / currentPoints.total;
-
-  classObj.gradeCalc.categories.forEach((category) => {
-    const existing = parsePoints(category.current);
-    const total = existing ? existing.total : 100;
-    const earned = ratio * total;
-    category.current = formatPoints(earned, total);
-  });
-  return true;
-}
-
 function updateGradeOutputs(classObj) {
-  syncCurrentInputFromWeighted(classObj);
-  if (currentGradeInput && document.activeElement !== currentGradeInput) {
-    currentGradeInput.value = classObj.gradeCalc.currentInput;
-  }
-
   const weighted = weightedCategoryAverage(classObj);
   if (weightedCurrentOutput) {
     weightedCurrentOutput.textContent =
@@ -443,9 +396,7 @@ function updateGradeOutputs(classObj) {
   const current = currentCourseGrade(classObj);
   if (neededAssignmentOutput) {
     const neededAssignment = neededAssignmentPoints(classObj);
-    if (current === null) {
-      neededAssignmentOutput.textContent = "Needed assignment score: Enter current points (e.g. 350/400).";
-    } else if (!neededAssignment) {
+    if (!neededAssignment || current === null) {
       neededAssignmentOutput.textContent = "Needed assignment score: --";
     } else if (neededAssignment.error) {
       neededAssignmentOutput.textContent = `Needed assignment score: ${neededAssignment.error}`;
@@ -462,11 +413,7 @@ function updateGradeOutputs(classObj) {
   const neededExam = neededScore(current, targetExam, examWeight);
   if (neededExamOutput) {
     neededExamOutput.textContent =
-      current === null
-        ? "Needed exam score: Enter current points (e.g. 350/400)."
-        : neededExam === null
-          ? "Needed exam score: --"
-          : `Needed exam score: ${neededExam.toFixed(2)}%`;
+      neededExam === null ? "Needed exam score: --" : `Needed exam score: ${neededExam.toFixed(2)}%`;
   }
 }
 
@@ -492,7 +439,6 @@ function renderGradeCalculator() {
   }
 
   gradeClassSelect.value = classObj.id;
-  if (currentGradeInput) currentGradeInput.value = classObj.gradeCalc.currentInput;
   if (targetGradeInput) targetGradeInput.value = classObj.gradeCalc.targetGrade;
   if (assignmentPointsInput) assignmentPointsInput.value = classObj.gradeCalc.assignmentPoints;
   if (targetExamGradeInput) targetExamGradeInput.value = classObj.gradeCalc.targetExamGrade;
@@ -967,21 +913,6 @@ if (gradeClassSelect) {
     state.gradeSelectedClassId = gradeClassSelect.value || null;
     saveState();
     renderGradeCalculator();
-  });
-}
-
-if (currentGradeInput) {
-  currentGradeInput.addEventListener("input", () => {
-    const classObj = activeGradeClass();
-    if (!classObj) return;
-    classObj.gradeCalc.currentInput = currentGradeInput.value.trim();
-    const changedCategories = applyCurrentPointsToCategories(classObj, classObj.gradeCalc.currentInput);
-    saveState();
-    if (changedCategories) {
-      renderGradeCalculator();
-    } else {
-      updateGradeOutputs(classObj);
-    }
   });
 }
 
