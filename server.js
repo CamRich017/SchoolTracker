@@ -21,7 +21,7 @@ const MIME_TYPES = {
 
 function safePath(urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?")[0]);
-  const requested = decoded === "/" ? "/index.html" : decoded;
+  const requested = decoded === "/" ? "/Page.html" : decoded;
   const normalized = path.normalize(requested).replace(/^([.][.][/\\])+/, "");
   return path.join(ROOT, normalized);
 }
