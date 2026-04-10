@@ -1,0 +1,1 @@
+SchoolTracker is a simple assignment tracker web app that lets you create and manage classes, add assignments and quizzes with due dates, mark work as completed, view upcoming due dates on a calendar, and calculate weighted grades with custom category weights, all in a clean vanilla HTML/CSS/JavaScript interface that stores data locally in the browser.
